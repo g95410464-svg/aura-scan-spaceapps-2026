@@ -1,0 +1,12 @@
+services:
+  aura:
+    build: .
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      # Solo para localhost HTTP. En producción HTTPS: true.
+      SECURE_COOKIES: "false"
+    volumes:
+      - aura-data:/data
+volumes:
+  aura-data:

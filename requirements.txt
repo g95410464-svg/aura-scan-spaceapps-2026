@@ -1,0 +1,10 @@
+fastapi==0.163.0
+uvicorn==0.54.0
+python-multipart==0.0.33
+SQLAlchemy==2.1.8
+Pillow==13.0.0
+rapidocr-onnxruntime==1.4.4
+opencv-python==5.0.0.93
+reportlab==5.1.0
+argon2-cffi==25.1.0
+psycopg[binary]==3.3.9

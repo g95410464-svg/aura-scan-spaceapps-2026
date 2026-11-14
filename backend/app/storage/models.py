@@ -1,0 +1,68 @@
+import uuid
+from datetime import datetime, timezone
+from sqlalchemy import String, Text, ForeignKey, JSON, Integer
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+
+def uid():
+    return str(uuid.uuid4())
+
+
+def now_iso():
+    return datetime.now(timezone.utc).isoformat()
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+class User(Base):
+    __tablename__ = 'users'
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    username: Mapped[str] = mapped_column(String(40), unique=True)
+    password_hash: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[str] = mapped_column(String(40), default=now_iso)
+
+
+class AuthSession(Base):
+    __tablename__ = 'auth_sessions'
+    token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey('users.id'), index=True)
+    csrf: Mapped[str] = mapped_column(String(64))
+    expires_at: Mapped[int] = mapped_column(Integer, index=True)
+
+
+class Capture(Base):
+    __tablename__ = 'captures'
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    owner_id: Mapped[str] = mapped_column(ForeignKey('users.id'), index=True)
+    created_at: Mapped[str] = mapped_column(String(40), default=now_iso)
+    device_type: Mapped[str] = mapped_column(String(30))
+    status: Mapped[str] = mapped_column(String(20), default='pending')
+    is_demo: Mapped[bool] = mapped_column(default=False)
+    result: Mapped[dict] = mapped_column(JSON)
+
+
+class Measurement(Base):
+    __tablename__ = 'measurements'
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    owner_id: Mapped[str] = mapped_column(ForeignKey('users.id'), index=True)
+    capture_id: Mapped[str] = mapped_column(ForeignKey('captures.id'), unique=True)
+    created_at: Mapped[str] = mapped_column(String(40), default=now_iso)
+    measured_at: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    subject_alias: Mapped[str] = mapped_column(String(80))
+    device_type: Mapped[str] = mapped_column(String(30))
+    is_demo: Mapped[bool] = mapped_column(default=False)
+    readings: Mapped[list] = mapped_column(JSON)
+    symptoms: Mapped[str] = mapped_column(Text, default='')
+    assessment: Mapped[dict] = mapped_column(JSON)
+
+
+class AuditEvent(Base):
+    __tablename__ = 'audit_events'
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    owner_id: Mapped[str] = mapped_column(ForeignKey('users.id'), index=True)
+    capture_id: Mapped[str] = mapped_column(ForeignKey('captures.id'))
+    created_at: Mapped[str] = mapped_column(String(40), default=now_iso)
+    action: Mapped[str] = mapped_column(String(40))
+    detail: Mapped[dict] = mapped_column(JSON)
