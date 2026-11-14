@@ -60,11 +60,11 @@ Para un host HTTPS: construir con `Dockerfile`, montar almacenamiento persistent
 
 La versión inicial crea las tablas ausentes al iniciar; no incluye migraciones de esquemas existentes. Antes de evolucionar un despliegue con datos se necesitan migraciones versionadas y copia/restauración probada. El almacenamiento de capturas es local a un volumen, no un bucket externo.
 
-## Producto
+## Objetivo del producto
 
-Una web publicada donde el astronauta muestra la pantalla de un instrumento médico a la cámara. Un servicio Python identifica un modelo compatible, interpreta sus etiquetas, valores y unidades, y prepara una lectura para confirmación. La lectura confirmada se incorpora al historial, a una evaluación orientativa y al informe.
+La entrega prevista es una web publicada donde el astronauta muestra la pantalla de un instrumento médico a la cámara. La versión 0.1 interpreta etiquetas, valores y unidades, y prepara una lectura para confirmación; la identificación de modelos exactos sigue pendiente. La lectura confirmada se incorpora al historial y al informe.
 
-El usuario final abre un enlace; no instala Python ni inicia servicios locales.
+En el despliegue final, el usuario abrirá un enlace sin instalar Python ni iniciar servicios locales.
 
 ## Documentación
 
@@ -82,6 +82,7 @@ El usuario final abre un enlace; no instala Python ni inicia servicios locales.
 ```text
 backend/
   app/
+    main.py          API y composición de la versión inicial
     api/             Endpoints y contratos
     core/            Configuración y seguridad
     vision/          Calidad de captura, pantalla y OCR
@@ -94,6 +95,7 @@ backend/
   migrations/       Cambios de esquema de base de datos
 frontend/
   src/
+    main.tsx         Interfaz de la versión inicial
     components/      Componentes comunes
     features/
       capture/       Cámara, carga y guía de encuadre

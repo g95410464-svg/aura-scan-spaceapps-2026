@@ -17,7 +17,10 @@ Fecha: 14 de noviembre de 2026.
 
 - 23 pruebas de backend: OCR sobre pantalla sintética, confirmación, auditoría, unidades, ausencia de hora, PDF, acceso entre usuarios y CSRF.
 - Compilación TypeScript y Vite.
+- Backend e interfaz aprobados también en GitHub Actions sobre Linux para el commit inicial.
 - En navegador: registro de una cuenta ficticia, demostración con OCR, confirmación, informe en pantalla, historial y las cinco fichas científicas.
+- Carga de una imagen sintética desde el selector de archivos del navegador; OCR y campos revisables comprobados.
+- Sesión de usuario conservada después de reiniciar el servidor.
 - En la demostración sintética se extrajeron 120/80 mmHg y 72 lpm. No es una prueba de exactitud clínica o de dispositivos físicos.
 
 ## Pendiente
