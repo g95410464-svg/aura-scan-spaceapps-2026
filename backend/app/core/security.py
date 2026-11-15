@@ -3,11 +3,24 @@ import secrets
 import time
 from collections import defaultdict, deque
 from threading import Lock
+from urllib.parse import urlsplit
 from fastapi import Depends, HTTPException, Request
 from backend.app.storage.models import BrowserSession, Workspace
 
 _attempts = defaultdict(deque)
 _rate_lock = Lock()
+
+
+def origin_key(value):
+    """Compare exact origins without trusting arbitrary forwarded headers."""
+    try:
+        parsed = urlsplit(value)
+        if (parsed.scheme not in {'http', 'https'} or not parsed.hostname or parsed.username is not None
+                or parsed.password is not None or parsed.path not in {'', '/'} or parsed.query or parsed.fragment):
+            return None
+        return parsed.scheme, parsed.hostname.lower(), parsed.port or (443 if parsed.scheme == 'https' else 80)
+    except ValueError:
+        return None
 
 
 def get_db(request: Request):

@@ -8,7 +8,7 @@ from sqlalchemy import create_engine, select, delete, event
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import IntegrityError
 from backend.app.core.settings import Settings
-from backend.app.core.security import get_workspace, get_db, limit_attempts, digest
+from backend.app.core.security import get_workspace, get_db, limit_attempts, digest, origin_key
 from backend.app.storage.models import Base, Workspace, BrowserSession, Capture, Measurement, AuditEvent
 from backend.app.measurements.schemas import Confirmation
 from backend.app.devices.catalog import catalog, DEVICES
@@ -41,10 +41,10 @@ def create_app(settings: Settings | None = None):
     async def protection(request,call_next):
         if request.method not in {'GET','HEAD','OPTIONS'}:
             origin=request.headers.get('origin')
-            allowed={str(request.base_url).rstrip('/')}
+            allowed={origin_key(str(request.base_url))}
             if config.public_origin:
-                allowed.add(config.public_origin.rstrip('/'))
-            if origin and origin not in allowed:
+                allowed.add(origin_key(config.public_origin))
+            if origin and (origin_key(origin) is None or origin_key(origin) not in allowed):
                 return JSONResponse({'detail':'Origen no permitido.'},status_code=403)
         length=request.headers.get('content-length')
         try:
