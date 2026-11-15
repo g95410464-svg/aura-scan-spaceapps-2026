@@ -2,18 +2,18 @@
 
 Primera versión ejecutable de una web de captura visual de instrumentos médicos para el reto de salud espacial de NASA Space Apps 2026. Nombre de trabajo; sin afiliación ni aprobación de NASA.
 
-**Estado 0.1:** interfaz React/TypeScript, API FastAPI, OCR real en Python, confirmación de lecturas, historial privado e informes PDF. El despliegue público de la aplicación todavía no se ha realizado. El repositorio sí es público.
+**Estado 0.2:** interfaz React/TypeScript, API FastAPI, OCR real en Python, confirmación de lecturas, historial privado e informes PDF. El despliegue público de la aplicación todavía no se ha realizado. El repositorio sí es público.
 
 Repositorio: https://github.com/g95410464-svg/aura-scan-spaceapps-2026
 
 ## Qué funciona
 
-- Registro e inicio de sesión con contraseñas Argon2 y sesiones en cookies HttpOnly.
+- Acceso directo a captura al abrir la web, sin registro, contraseña ni inicio de sesión. Un espacio anónimo por navegador se prepara automáticamente con cookie HttpOnly.
 - Captura desde cámara o carga de PNG/JPEG/WebP, hasta 8 MB y 12 megapíxeles.
 - OCR con RapidOCR/ONNX y OpenCV, seguido de asociación por etiquetas y unidades visibles.
 - Campos de tensiómetro, pulsioxímetro, termómetro y glucómetro; son categorías experimentales, no modelos físicos certificados.
 - Revisión y corrección antes de confirmar. Se conservan candidatos originales y auditoría.
-- Historial aislado por usuario, contexto declarado y tiempos de captura, medición y confirmación separados.
+- Historial aislado por espacio de navegador, contexto declarado y tiempos de captura, medición y confirmación separados.
 - Informe PDF y comparación numérica con el registro anterior comparable.
 - Cinco recursos NASA/CSA integrados como fichas de contexto y referencias en informes.
 - Demostración con pantalla sintética procesada por el mismo OCR, identificada como ficticia.
@@ -36,7 +36,11 @@ cd ..
 
 En Linux/macOS, sustituir `.\.venv\Scripts\python.exe` por `.venv/bin/python`.
 
-Abrir http://127.0.0.1:8000, crear una cuenta de prueba y pulsar **Usar demostración**. El usuario de una futura web publicada solo abrirá el enlace; estos comandos son para desarrollo.
+Abrir http://127.0.0.1:8000, pulsar **Usar demostración**. El usuario de una futura web publicada solo abrirá el enlace; estos comandos son para desarrollo.
+
+### Acceso directo e historial
+
+La primera pantalla es la captura. No hay cuentas, registro, contraseña ni botón de entrada. El navegador recibe automáticamente un espacio privado con una cookie de 8 horas por defecto. Al caducar o borrar la cookie se abre un espacio nuevo; el historial anterior no se recupera desde la interfaz ni se sincroniza entre dispositivos. Descargar el PDF permite conservar una copia del informe.
 
 ### Desarrollo de interfaz
 
@@ -50,7 +54,7 @@ cd frontend
 npm run build
 ```
 
-GitHub Actions verifica backend e interfaz en cada push y pull request. Las pruebas incluyen OCR real sobre imagen sintética, aislamiento entre usuarios, CSRF, unidades, correcciones auditadas e informe PDF.
+GitHub Actions verifica backend e interfaz en cada push y pull request. Las pruebas incluyen OCR real sobre imagen sintética, aislamiento entre navegadores, CSRF, unidades, correcciones auditadas e informe PDF.
 
 ## Contenedor y persistencia
 
@@ -62,7 +66,7 @@ La versión inicial crea las tablas ausentes al iniciar; no incluye migraciones 
 
 ## Objetivo del producto
 
-La entrega prevista es una web publicada donde el astronauta muestra la pantalla de un instrumento médico a la cámara. La versión 0.1 interpreta etiquetas, valores y unidades, y prepara una lectura para confirmación; la identificación de modelos exactos sigue pendiente. La lectura confirmada se incorpora al historial y al informe.
+La entrega prevista es una web publicada donde el astronauta muestra la pantalla de un instrumento médico a la cámara. La versión 0.2 interpreta etiquetas, valores y unidades, y prepara una lectura para confirmación; la identificación de modelos exactos sigue pendiente. La lectura confirmada se incorpora al historial y al informe.
 
 En el despliegue final, el usuario abrirá un enlace sin instalar Python ni iniciar servicios locales.
 
@@ -117,4 +121,4 @@ docs/                Decisiones y planificación
 infra/               Configuración futura de despliegue
 ```
 
-Las carpetas aún reservadas contienen `.gitkeep`. No se publica ninguna credencial, base de datos de usuarios ni captura privada en este repositorio. `tmp/` contiene únicamente trabajo local ignorado.
+Las carpetas aún reservadas contienen `.gitkeep`. No se publica ninguna credencial, base de datos privada ni captura privada en este repositorio. `tmp/` contiene únicamente trabajo local ignorado.

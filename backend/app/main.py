@@ -1,8 +1,6 @@
-import hashlib
 import secrets
 import time
 from contextlib import asynccontextmanager
-from pathlib import Path
 from fastapi import FastAPI, Request, Response, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -10,9 +8,9 @@ from sqlalchemy import create_engine, select, delete, event
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import IntegrityError
 from backend.app.core.settings import Settings
-from backend.app.core.security import authorize, get_db, hasher, verify_password, limit_attempts, digest
-from backend.app.storage.models import Base, User, AuthSession, Capture, Measurement, AuditEvent
-from backend.app.measurements.schemas import Credentials, Confirmation
+from backend.app.core.security import get_workspace, get_db, limit_attempts, digest
+from backend.app.storage.models import Base, Workspace, BrowserSession, Capture, Measurement, AuditEvent
+from backend.app.measurements.schemas import Confirmation
 from backend.app.devices.catalog import catalog, DEVICES
 from backend.app.vision.reader import sanitize_image, analyze_image, ImageRejected
 from backend.app.vision.demo import demo_image
@@ -34,7 +32,7 @@ def create_app(settings: Settings | None = None):
         Base.metadata.create_all(engine)
         yield
         engine.dispose()
-    app=FastAPI(title='AURA Scan',version='0.1.0',lifespan=lifespan,docs_url=None,redoc_url=None,
+    app=FastAPI(title='AURA Scan',version='0.2.0',lifespan=lifespan,docs_url=None,redoc_url=None,
                 description='Captura visual experimental de instrumentos. Sin diagnóstico clínico validado.')
     app.state.db_session=sessionmaker(engine,expire_on_commit=False)
     app.state.settings=config
@@ -65,51 +63,29 @@ def create_app(settings: Settings | None = None):
             response.headers['Cache-Control']='no-store'
         return response
 
-    def new_session(user,db,response):
-        token=secrets.token_urlsafe(32)
-        csrf=secrets.token_hex(32)
-        db.execute(delete(AuthSession).where(AuthSession.expires_at<int(time.time())))
-        db.add(AuthSession(token_hash=digest(token),user_id=user.id,csrf=csrf,expires_at=int(time.time())+config.session_hours*3600))
-        db.commit()
-        response.set_cookie('aura_session',token,httponly=True,secure=config.secure_cookies,samesite='lax',max_age=config.session_hours*3600,path='/')
-        return {'user':{'username':user.username},'csrf':csrf}
-
     @app.get('/api/health')
     def health():
-        return {'status':'ok','version':'0.1.0','clinical_validation':False,'dataset_integrated':False}
+        return {'status':'ok','version':'0.2.0','clinical_validation':False,'dataset_integrated':False}
 
-    @app.post('/api/auth/register',status_code=201)
-    def register(data: Credentials,request: Request,response: Response,db=Depends(get_db)):
-        limit_attempts(request,'register',10,3600)
-        user=User(username=data.username.lower(),password_hash=hasher.hash(data.password))
-        db.add(user)
-        try:
-            db.flush()
-        except IntegrityError:
-            db.rollback();raise HTTPException(409,'Ese usuario ya existe.')
-        return new_session(user,db,response)
-
-    @app.post('/api/auth/login')
-    def login(data: Credentials,request: Request,response: Response,db=Depends(get_db)):
-        limit_attempts(request,'login',15,900)
-        user=db.scalar(select(User).where(User.username==data.username.lower()))
-        # Perform a password hash check even for an unknown username.
-        stored=user.password_hash if user else app.state.dummy_hash
-        if not verify_password(data.password,stored) or user is None:
-            raise HTTPException(401,'Usuario o contraseña incorrectos.')
-        return new_session(user,db,response)
-
-    app.state.dummy_hash=hasher.hash(secrets.token_hex(32))
-
-    @app.get('/api/auth/me')
-    def me(request: Request,user=Depends(authorize),db=Depends(get_db)):
-        auth=db.get(AuthSession,digest(request.cookies['aura_session']))
-        return {'user':{'username':user.username},'csrf':auth.csrf}
-
-    @app.post('/api/auth/logout',status_code=204)
-    def logout(request: Request,response: Response,user=Depends(authorize),db=Depends(get_db)):
-        db.execute(delete(AuthSession).where(AuthSession.token_hash==digest(request.cookies['aura_session'])))
-        db.commit();response.delete_cookie('aura_session',path='/')
+    @app.get('/api/session')
+    def browser_session(request: Request,response: Response,db=Depends(get_db)):
+        """Create an anonymous browser workspace automatically, without accounts."""
+        token=request.cookies.get('aura_browser','')
+        current=db.get(BrowserSession,digest(token)) if token else None
+        if current is not None and current.expires_at>int(time.time()):
+            return {'csrf':current.csrf,'expires_at':current.expires_at}
+        limit_attempts(request,'browser_session',60,3600)
+        token=secrets.token_urlsafe(32)
+        csrf=secrets.token_hex(32)
+        db.execute(delete(BrowserSession).where(BrowserSession.expires_at<=int(time.time())))
+        workspace=Workspace()
+        db.add(workspace);db.flush()
+        expires_at=int(time.time())+config.session_hours*3600
+        db.add(BrowserSession(token_hash=digest(token),workspace_id=workspace.id,csrf=csrf,expires_at=expires_at))
+        db.commit()
+        response.set_cookie('aura_browser',token,httponly=True,secure=config.secure_cookies,samesite='lax',max_age=config.session_hours*3600,path='/')
+        response.delete_cookie('aura_session',path='/')
+        return {'csrf':csrf,'expires_at':expires_at}
 
     @app.get('/api/knowledge')
     def knowledge():
@@ -119,19 +95,19 @@ def create_app(settings: Settings | None = None):
     def devices():
         return {'devices':catalog(),'exact_models':[], 'dataset_status':'not_integrated'}
 
-    def owner_capture(capture_id,user,db):
-        item=db.scalar(select(Capture).where(Capture.id==capture_id,Capture.owner_id==user.id))
+    def owner_capture(capture_id,workspace,db):
+        item=db.scalar(select(Capture).where(Capture.id==capture_id,Capture.owner_id==workspace.id))
         if not item: raise HTTPException(404,'Captura no encontrada.')
         return item
 
-    def store_capture(content,device_type,is_demo,user,db):
+    def store_capture(content,device_type,is_demo,workspace,db):
         if device_type not in {'auto',*DEVICES}:
             raise HTTPException(422,'Categoría no admitida.')
         try:
             normalized=sanitize_image(content)
         except ImageRejected as exc:
             raise HTTPException(422,str(exc))
-        capture=Capture(owner_id=user.id,device_type=device_type,result={},is_demo=is_demo)
+        capture=Capture(owner_id=workspace.id,device_type=device_type,result={},is_demo=is_demo)
         db.add(capture);db.flush()
         path=config.storage_dir/f'{capture.id}.png'
         path.write_bytes(normalized)
@@ -151,25 +127,25 @@ def create_app(settings: Settings | None = None):
                 'image_url':f'/api/captures/{capture.id}/image',**result}
 
     @app.post('/api/captures',status_code=201)
-    def upload(request: Request,file: UploadFile=File(...),device_type: str=Form('auto'),is_demo: bool=Form(False),user=Depends(authorize),db=Depends(get_db)):
+    def upload(request: Request,file: UploadFile=File(...),device_type: str=Form('auto'),is_demo: bool=Form(False),workspace=Depends(get_workspace),db=Depends(get_db)):
         limit_attempts(request,'capture',40,3600)
         content=file.file.read(config.max_upload_bytes+1)
         if len(content)>config.max_upload_bytes: raise HTTPException(413,'La imagen excede el límite de 8 MB.')
-        return store_capture(content,device_type,is_demo,user,db)
+        return store_capture(content,device_type,is_demo,workspace,db)
 
     @app.post('/api/captures/demo',status_code=201)
-    def demo(request: Request,user=Depends(authorize),db=Depends(get_db)):
+    def demo(request: Request,workspace=Depends(get_workspace),db=Depends(get_db)):
         limit_attempts(request,'capture',40,3600)
-        return store_capture(demo_image(),'auto',True,user,db)
+        return store_capture(demo_image(),'auto',True,workspace,db)
 
     @app.get('/api/captures/{capture_id}/image')
-    def capture_image(capture_id: str,user=Depends(authorize),db=Depends(get_db)):
-        item=owner_capture(capture_id,user,db)
+    def capture_image(capture_id: str,workspace=Depends(get_workspace),db=Depends(get_db)):
+        item=owner_capture(capture_id,workspace,db)
         return FileResponse(config.storage_dir/f'{item.id}.png',media_type='image/png')
 
     @app.post('/api/captures/{capture_id}/confirm',status_code=201)
-    def confirm(capture_id: str,data: Confirmation,user=Depends(authorize),db=Depends(get_db)):
-        capture=owner_capture(capture_id,user,db)
+    def confirm(capture_id: str,data: Confirmation,workspace=Depends(get_workspace),db=Depends(get_db)):
+        capture=owner_capture(capture_id,workspace,db)
         if capture.status!='pending':raise HTTPException(409,'Esta captura ya fue confirmada.')
         candidates={r['code']:r for r in capture.result.get('fields',[])}
         readings=[]
@@ -177,16 +153,16 @@ def create_app(settings: Settings | None = None):
             r=reading.model_dump(); old=candidates.get(r['code'])
             r['provenance']='ocr_confirmed' if old and old['value']==r['value'] and old['unit']==r['unit'] else 'user_reviewed'
             readings.append(r)
-        previous=db.scalar(select(Measurement).where(Measurement.owner_id==user.id,Measurement.subject_alias==data.subject_alias,
+        previous=db.scalar(select(Measurement).where(Measurement.owner_id==workspace.id,Measurement.subject_alias==data.subject_alias,
                            Measurement.device_type==data.device_type,Measurement.is_demo==capture.is_demo).order_by(Measurement.created_at.desc()).limit(1))
         measured_at=data.measured_at.isoformat() if data.measured_at else None
         assessment=evaluate(readings,data.symptoms,measured_at,previous)
-        record=Measurement(owner_id=user.id,capture_id=capture.id,subject_alias=data.subject_alias,
+        record=Measurement(owner_id=workspace.id,capture_id=capture.id,subject_alias=data.subject_alias,
                            device_type=data.device_type,is_demo=capture.is_demo,measured_at=measured_at,
                            readings=readings,symptoms=data.symptoms,assessment=assessment)
         db.add(record)
         capture.status='confirmed'
-        db.add(AuditEvent(owner_id=user.id,capture_id=capture.id,action='confirmed',
+        db.add(AuditEvent(owner_id=workspace.id,capture_id=capture.id,action='confirmed',
                           detail={'candidates':capture.result.get('fields',[]),'confirmed':readings,'device_type':data.device_type}))
         try:
             db.commit()
@@ -198,13 +174,13 @@ def create_app(settings: Settings | None = None):
         return {key:getattr(record,key) for key in ['id','capture_id','created_at','measured_at','subject_alias','device_type','is_demo','readings','symptoms','assessment']}
 
     @app.get('/api/measurements')
-    def history(user=Depends(authorize),db=Depends(get_db)):
-        records=db.scalars(select(Measurement).where(Measurement.owner_id==user.id).order_by(Measurement.created_at.desc()).limit(100)).all()
+    def history(workspace=Depends(get_workspace),db=Depends(get_db)):
+        records=db.scalars(select(Measurement).where(Measurement.owner_id==workspace.id).order_by(Measurement.created_at.desc()).limit(100)).all()
         return {'items':[serialize(r) for r in records]}
 
     @app.get('/api/measurements/{record_id}/report.pdf')
-    def report(record_id: str,user=Depends(authorize),db=Depends(get_db)):
-        record=db.scalar(select(Measurement).where(Measurement.id==record_id,Measurement.owner_id==user.id))
+    def report(record_id: str,workspace=Depends(get_workspace),db=Depends(get_db)):
+        record=db.scalar(select(Measurement).where(Measurement.id==record_id,Measurement.owner_id==workspace.id))
         if not record:raise HTTPException(404,'Informe no encontrado.')
         capture=db.get(Capture,record.capture_id)
         return Response(render_report(record,capture),media_type='application/pdf',

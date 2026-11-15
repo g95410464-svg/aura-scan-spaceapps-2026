@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Activity, ArrowDownToLine, ArrowRight, ArrowUpRight, BookOpen, Camera, Check, CheckCircle2, ChevronRight, ClipboardList, FileText, History, Info, LoaderCircle, LogOut, Orbit, Plus, RefreshCw, ScanLine, ShieldCheck, Upload, X } from 'lucide-react';
-import { request, setCsrf } from './services/api';
+import { Activity, ArrowDownToLine, ArrowRight, ArrowUpRight, BookOpen, Camera, Check, CheckCircle2, ChevronRight, ClipboardList, FileText, History, Info, LoaderCircle, Orbit, Plus, RefreshCw, ScanLine, ShieldCheck, Upload, X } from 'lucide-react';
+import { request, ensureSession, resetSession } from './services/api';
 import type { Capture, Device, Measurement, Source } from './services/api';
 import './styles.css';
 
@@ -12,28 +12,6 @@ const message = (e: unknown) => e instanceof Error ? e.message : 'No se pudo com
 
 function Brand({ light = false }: { light?: boolean }) {
   return <div className={`brand ${light ? 'light' : ''}`}><span className="brand-icon"><Orbit size={29} strokeWidth={1.4} /></span><span>AURA<span className="brand-scan">SCAN</span></span></div>;
-}
-
-function Auth({ onAuth }: { onAuth: (name: string) => void }) {
-  const [register, setRegister] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  async function submit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault(); setBusy(true); setError('');
-    const form = new FormData(e.currentTarget);
-    try {
-      const result = await request<{ user: { username: string }; csrf: string }>(`/auth/${register ? 'register' : 'login'}`, { method: 'POST', body: JSON.stringify({ username: form.get('username'), password: form.get('password') }) });
-      setCsrf(result.csrf); onAuth(result.user.username);
-    } catch (e) { setError(message(e)); } finally { setBusy(false); }
-  }
-  return <main className="auth-shell">
-    <section className="auth-story"><Brand light /><div className="auth-orbit" aria-hidden="true"><Orbit size={260} strokeWidth={.35} /><ScanLine size={54} strokeWidth={1} /></div><div><span className="eyebrow">SALUD DE MISIÓN / PROTOTIPO 0.1</span><h1>De una pantalla<br />a una historia<br /><em>más completa.</em></h1><p>Captura las lecturas de un instrumento, revísalas y conserva un registro con evidencia.</p></div><div className="auth-steps"><span>01 Enfoca</span><span>02 Revisa</span><span>03 Registra</span></div></section>
-    <section className="auth-form"><div className="auth-form-inner"><span className="tag"><span className="status-dot" /> Entorno experimental</span><h2>{register ? 'Crea tu espacio de trabajo' : 'Tu próxima lectura empieza aquí.'}</h2><p>Un historial privado para cada usuario. Usa un alias y datos ficticios para explorar esta primera versión.</p>
-      <form onSubmit={submit}><label>Usuario<input name="username" placeholder="ej. tripulante01" minLength={3} maxLength={40} pattern="[a-zA-Z0-9_.-]+" autoComplete="username" required /></label><label>Contraseña<input name="password" type="password" placeholder="Al menos 10 caracteres" minLength={10} maxLength={128} autoComplete={register ? 'new-password' : 'current-password'} required /></label>{error && <div className="notice error" role="alert">{error}</div>}<button className="button primary full" disabled={busy}>{busy ? <LoaderCircle className="spin" size={18} /> : <ArrowRight size={18} />}{register ? 'Crear cuenta' : 'Entrar al espacio'}</button></form>
-      <button className="text-button auth-switch" onClick={() => { setRegister(!register); setError(''); }}>{register ? 'Ya tengo una cuenta. Iniciar sesión' : 'Primera visita: crear una cuenta'}</button>
-      <div className="auth-footnote"><ShieldCheck size={20} /><span>Las imágenes son privadas. Esta versión registra mediciones y contexto; no ofrece diagnósticos ni tratamientos validados.</span></div>
-    </div></section>
-  </main>;
 }
 
 function Report({ record, onNew }: { record: Measurement; onNew?: () => void }) {
@@ -118,7 +96,7 @@ function CapturePage({ devices, onSaved }: { devices: Device[]; onSaved: (m: Mea
       </div>
       <div className="capture-controls">{live ? <><button className="button primary" disabled={!cameraReady || busy} onClick={takePhoto}><Camera size={17} /> Tomar captura</button><button className="button secondary" onClick={stopCamera}>Cerrar cámara</button></> : <><button className="button primary" disabled={busy} onClick={startCamera}><Camera size={17} /> {capture ? 'Repetir con cámara' : 'Abrir cámara'}</button><button className="button secondary" disabled={busy} onClick={() => fileInput.current?.click()}><Upload size={17} /> Cargar imagen</button></>}</div>
       <input className="visually-hidden" ref={fileInput} type="file" accept="image/jpeg,image/png,image/webp" aria-label="Seleccionar imagen del instrumento" onChange={e => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void analyze(file); }} />
-      <div className="capture-note"><ShieldCheck size={17} /><span>PNG, JPG o WebP · Hasta 8 MB y 12 megapíxeles. La imagen queda privada en tu cuenta.</span></div>
+      <div className="capture-note"><ShieldCheck size={17} /><span>PNG, JPG o WebP · Hasta 8 MB y 12 megapíxeles. La imagen queda vinculada al espacio de este navegador.</span></div>
       {!capture && <div className="demo-box"><div><strong>Explora antes de capturar</strong><p>Prueba el OCR con una pantalla generada y datos ficticios.</p></div><button className="text-button" disabled={busy} onClick={() => void analyze()}>Usar demostración <ArrowRight size={16} /></button></div>}
     </section>
     <section className="review-panel"><div className="panel-title compact"><div><span className="eyebrow">{capture ? 'PASO 02' : 'PREPARACIÓN'}</span><h2>{capture ? 'Revisa antes de guardar' : '¿Qué vas a registrar?'}</h2></div><ClipboardList size={22} /></div>
@@ -138,31 +116,36 @@ function CapturePage({ devices, onSaved }: { devices: Device[]; onSaved: (m: Mea
 }
 
 function App() {
-  const [user, setUser] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sessionGeneration, setSessionGeneration] = useState(0);
+  const [bootError, setBootError] = useState('');
   const [tab, setTab] = useState<Tab>('capture');
   const [devices, setDevices] = useState<Device[]>([]);
   const [sources, setSources] = useState<Source[]>([]);
   const [records, setRecords] = useState<Measurement[]>([]);
   const [selectedRecord, setSelectedRecord] = useState<Measurement | null>(null);
   const [error, setError] = useState('');
-  useEffect(() => { void request<{ user: { username: string }; csrf: string }>('/auth/me').then(r => { setUser(r.user.username); setCsrf(r.csrf); }).catch(() => {}).finally(() => setLoading(false)); }, []);
   useEffect(() => {
-    const expired = () => { setUser(null); setCsrf(''); setRecords([]); setSelectedRecord(null); };
+    const expired = () => { resetSession(); setLoading(true); setRecords([]); setSelectedRecord(null); setTab('capture'); setSessionGeneration(g => g + 1); };
     window.addEventListener('aura-session-expired', expired);
     return () => window.removeEventListener('aura-session-expired', expired);
   }, []);
   useEffect(() => {
-    if (!user) return;
-    void Promise.all([request<{ devices: Device[] }>('/devices'), request<{ sources: Source[] }>('/knowledge'), request<{ items: Measurement[] }>('/measurements')]).then(([d, s, h]) => { setDevices(d.devices); setSources(s.sources); setRecords(h.items); }).catch(e => setError(message(e)));
-  }, [user]);
-  async function logout() { try { await request('/auth/logout', { method: 'POST' }); setUser(null); setCsrf(''); setRecords([]); setSelectedRecord(null); } catch (e) { setError(message(e)); } }
-  if (loading) return <div className="loading-screen"><Orbit size={40} className="slow-spin" /><span>Preparando tu espacio…</span></div>;
-  if (!user) return <Auth onAuth={setUser} />;
-  return <div className="app-shell"><aside className="sidebar"><Brand light /><div className="mission-label"><span className="status-dot" /> SALUD DE MISIÓN</div><nav aria-label="Navegación principal">{([{ id: 'capture', name: 'Nueva evaluación', icon: ScanLine }, { id: 'history', name: 'Historial', icon: History }, { id: 'knowledge', name: 'Conocimiento', icon: BookOpen }] as const).map(item => <button key={item.id} className={tab === item.id ? 'active' : ''} onClick={() => { setTab(item.id); setError(''); }}><item.icon size={19} />{item.name}{tab === item.id && <span className="nav-dot" />}</button>)}</nav><div className="sidebar-note"><Orbit size={30} strokeWidth={1} /><strong>La evidencia primero.</strong><p>Cada lectura conserva su procedencia y requiere tu confirmación.</p><span>SPACE APPS / 2026</span></div><div className="user-panel"><div className="avatar">{user[0].toUpperCase()}</div><div><strong>{user}</strong><small>Espacio privado</small></div><button aria-label="Cerrar sesión" onClick={() => void logout()}><LogOut size={18} /></button></div></aside>
-    <div className="main-shell"><header className="topbar"><div><span>Centro de salud</span><ChevronRight size={14} /><strong>{tab === 'capture' ? 'Evaluación' : tab === 'history' ? 'Historial' : 'Conocimiento'}</strong></div><span className="topbar-status"><span className="status-dot" /> Prototipo 0.1</span></header><main className="workspace">{error && <div className="notice error" role="alert">{error}<button aria-label="Cerrar aviso" onClick={() => setError('')}><X size={16} /></button></div>}
+    let active = true;
+    setBootError('');
+    void ensureSession().then(async () => {
+      if (!active) return;
+      const [d, s, h] = await Promise.all([request<{ devices: Device[] }>('/devices'), request<{ sources: Source[] }>('/knowledge'), request<{ items: Measurement[] }>('/measurements')]);
+      if (active) { setDevices(d.devices); setSources(s.sources); setRecords(h.items); }
+    }).catch(e => { if (active) setBootError(message(e)); }).finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [sessionGeneration]);
+  if (loading) return <div className="loading-screen"><Orbit size={40} className="slow-spin" /><span>Preparando el sistema…</span></div>;
+  if (bootError) return <div className="loading-screen"><Info size={32} /><span>{bootError}</span><button className="button primary" onClick={() => { setLoading(true); setSessionGeneration(g => g + 1); }}>Reintentar</button></div>;
+  return <div className="app-shell"><aside className="sidebar"><Brand light /><div className="mission-label"><span className="status-dot" /> SALUD DE MISIÓN</div><nav aria-label="Navegación principal">{([{ id: 'capture', name: 'Nueva evaluación', icon: ScanLine }, { id: 'history', name: 'Historial', icon: History }, { id: 'knowledge', name: 'Conocimiento', icon: BookOpen }] as const).map(item => <button key={item.id} className={tab === item.id ? 'active' : ''} onClick={() => { setTab(item.id); setError(''); }}><item.icon size={19} />{item.name}{tab === item.id && <span className="nav-dot" />}</button>)}</nav><div className="sidebar-note"><Orbit size={30} strokeWidth={1} /><strong>La evidencia primero.</strong><p>Cada lectura conserva su procedencia y requiere tu confirmación.</p><span>SPACE APPS / 2026</span></div><div className="workspace-status"><ShieldCheck size={19} /><div><strong>Acceso directo</strong><small>Espacio de este navegador</small></div></div></aside>
+    <div className="main-shell"><header className="topbar"><div><span>Centro de salud</span><ChevronRight size={14} /><strong>{tab === 'capture' ? 'Evaluación' : tab === 'history' ? 'Historial' : 'Conocimiento'}</strong></div><span className="topbar-status"><span className="status-dot" /> Prototipo 0.2</span></header><main className="workspace">{error && <div className="notice error" role="alert">{error}<button aria-label="Cerrar aviso" onClick={() => setError('')}><X size={16} /></button></div>}
       {tab === 'capture' && <CapturePage devices={devices} onSaved={record => setRecords(previous => [record, ...previous])} />}
-      {tab === 'history' && <><div className="page-heading"><div><span className="eyebrow">CONTINUIDAD / EVIDENCIA</span><h1>El contexto se construye<br />lectura a lectura.</h1><p>{records.length} registros confirmados en tu espacio.</p></div><button className="button primary" onClick={() => setTab('capture')}><Plus size={17} /> Nueva evaluación</button></div>{records.length === 0 ? <div className="empty-state"><History size={40} strokeWidth={1} /><h2>Tu historial empieza con una lectura.</h2><p>Las capturas pendientes no se añaden al informe hasta que las confirmes.</p><button className="button secondary" onClick={() => setTab('capture')}>Ir a captura <ArrowRight size={16} /></button></div> : <><div className="history-list">{records.map(record => <button className={selectedRecord?.id === record.id ? 'history-row selected' : 'history-row'} onClick={() => setSelectedRecord(record)} key={record.id}><span className="history-icon"><FileText size={20} /></span><span><strong>{record.subject_alias}</strong><small>{devices.find(d => d.id === record.device_type)?.label ?? record.device_type}</small></span><span className="history-values">{record.readings.map(r => `${r.value} ${r.unit}`).join(' · ')}</span><span><small>{date(record.created_at)}</small>{record.is_demo && <b className="demo-tag">Ficticio</b>}</span><ChevronRight size={17} /></button>)}</div>{selectedRecord && <Report record={selectedRecord} />}</> }</>}
+      {tab === 'history' && <><div className="page-heading"><div><span className="eyebrow">CONTINUIDAD / EVIDENCIA</span><h1>El contexto se construye<br />lectura a lectura.</h1><p>{records.length} registros confirmados en este navegador.</p></div><button className="button primary" onClick={() => setTab('capture')}><Plus size={17} /> Nueva evaluación</button></div>{records.length === 0 ? <div className="empty-state"><History size={40} strokeWidth={1} /><h2>Tu historial empieza con una lectura.</h2><p>Las capturas pendientes no se añaden al informe hasta que las confirmes.</p><button className="button secondary" onClick={() => setTab('capture')}>Ir a captura <ArrowRight size={16} /></button></div> : <><div className="history-list">{records.map(record => <button className={selectedRecord?.id === record.id ? 'history-row selected' : 'history-row'} onClick={() => setSelectedRecord(record)} key={record.id}><span className="history-icon"><FileText size={20} /></span><span><strong>{record.subject_alias}</strong><small>{devices.find(d => d.id === record.device_type)?.label ?? record.device_type}</small></span><span className="history-values">{record.readings.map(r => `${r.value} ${r.unit}`).join(' · ')}</span><span><small>{date(record.created_at)}</small>{record.is_demo && <b className="demo-tag">Ficticio</b>}</span><ChevronRight size={17} /></button>)}</div>{selectedRecord && <Report record={selectedRecord} />}</> }</>}
       {tab === 'knowledge' && <><div className="page-heading"><div><span className="eyebrow">CIENCIA / PROCEDENCIA</span><h1>Conocimiento con<br />sus fuentes a la vista.</h1><p>Cinco recursos oficiales para comprender el contexto de la salud espacial.</p></div><BookOpen size={36} strokeWidth={1} /></div><div className="notice"><Info size={18} /><span>Estos recursos aportan contexto científico. La biblioteca de protocolos diagnósticos y terapéuticos está pendiente de revisión clínica.</span></div><div className="sources-grid">{sources.map((source, i) => <article className="source-card" key={source.id}><div className="source-number">0{i + 1}<span>{source.organization}</span></div><h2>{source.title}</h2><p>{source.summary}</p><div className="source-application"><small>EN ESTA PLATAFORMA</small><p>{source.application}</p></div><a href={source.url} target="_blank" rel="noreferrer">Consultar fuente oficial <ArrowUpRight size={16} /></a></article>)}</div><div className="dataset-note"><RefreshCw size={22} /><div><h3>Reconocimiento de dispositivos: siguiente etapa</h3><p>El OCR actual interpreta etiquetas visibles. Los conjuntos Datumo/TILDE y Smart Scan están identificados para evaluación; todavía no están integrados y no acreditan compatibilidad con modelos de la ISS.</p></div></div></>}
       <footer className="workspace-footer"><span>AURA SCAN · CAPTURA, CONFIRMACIÓN Y SEGUIMIENTO</span><span>Uso experimental · Sin validación clínica</span></footer>
     </main></div></div>;

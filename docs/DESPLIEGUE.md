@@ -27,13 +27,15 @@ La aplicación todavía no tiene un enlace público de producción. El contenedo
 1. Ejecutar pruebas y compilar la interfaz.
 2. Construir `Dockerfile`; confirmar que los paquetes y los modelos OCR se cargan en el host.
 3. Configurar almacenamiento, variables y HTTPS, sin incluir datos reales en la imagen.
-4. Comprobar `/api/health` y completar registro → demostración → confirmación → historial → informe PDF.
+4. Comprobar `/api/health` y completar entrada directa → demostración → confirmación → historial → informe PDF.
 5. Reiniciar el servicio y comprobar persistencia.
-6. Verificar cuentas aisladas, denegación de cámara, imágenes ilegibles y errores de red.
+6. Verificar espacios de navegador aislados, denegación de cámara, imágenes ilegibles y errores de red.
 7. Probar copia/restauración y definir retención/eliminación de capturas antes de habilitar datos reales.
 
-No se ha contratado un proveedor ni se anuncian costos o capacidad sin comprobarlos. La limitación de intentos de login/captura es por proceso; varios workers o réplicas necesitan un limitador compartido y almacenamiento consistente.
+No se ha contratado un proveedor ni se anuncian costos o capacidad sin comprobarlos. La limitación de intentos de creación de espacios/captura es por proceso; varios workers o réplicas necesitan un limitador compartido y almacenamiento consistente.
 
 ## Evolución de esquema
 
 El primer arranque crea las tablas ausentes. No modifica automáticamente tablas existentes. Antes de publicar nuevas versiones con cambios de esquema, añadir migraciones y respaldos; no borrar el volumen para resolver una actualización.
+
+La versión 0.2 crea las tablas `workspaces`, `browser_sessions`, `workspace_captures`, `workspace_measurements` y `workspace_audit_events`. Si existe una base de la versión 0.1, sus tablas y archivos se conservan, pero no se enlazan a los espacios anónimos ni se exponen por la API nueva. La cookie antigua se descarta. No hay recuperación de cuentas ni migración automática de su historial; respaldar antes de actualizar.

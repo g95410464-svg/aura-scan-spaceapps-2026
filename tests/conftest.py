@@ -17,22 +17,22 @@ def client(application):
         yield client
 
 
-def sign_up(client,username='testcrew'):
-    response=client.post('/api/auth/register',json={'username':username,'password':'Testing-only-password-42'})
-    assert response.status_code==201,response.text
+def open_workspace(client):
+    response=client.get('/api/session')
+    assert response.status_code==200,response.text
     client.headers['X-CSRF-Token']=response.json()['csrf']
     return response
 
 
 @pytest.fixture
-def signed_client(client):
-    sign_up(client)
+def visitor_client(client):
+    open_workspace(client)
     return client
 
 
 @pytest.fixture
-def capture(signed_client):
-    response=signed_client.post('/api/captures/demo')
+def capture(visitor_client):
+    response=visitor_client.post('/api/captures/demo')
     assert response.status_code==201,response.text
     assert response.json()['recognition']=='visible_labels'
     return response.json()

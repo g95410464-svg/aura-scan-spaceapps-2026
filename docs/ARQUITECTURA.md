@@ -1,6 +1,6 @@
 # Arquitectura propuesta
 
-Estado: arquitectura propuesta con una primera implementación parcial. Ver `ESTADO.md` para funciones comprobadas y límites de la versión 0.1.
+Estado: arquitectura propuesta con una primera implementación parcial. Ver `ESTADO.md` para funciones comprobadas y límites de la versión 0.2.
 
 ```text
 Navegador (cámara o imagen)

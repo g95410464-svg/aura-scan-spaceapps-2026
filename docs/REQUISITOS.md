@@ -2,7 +2,7 @@
 
 ## Confirmados en la conversación
 
-- [x] Entrega virtual mediante una web publicada, con experiencia de acceso como LexCita.
+- [x] Entrega virtual mediante una web publicada, con entrada directa al sistema, sin registro ni inicio de sesión.
 - [x] Python para el análisis de imágenes.
 - [x] Reconocer instrumentos compatibles y leer sus pantallas LCD mediante cámara.
 - [x] Agregar las mediciones al historial e informe para aportar información a la evaluación de salud.
@@ -25,6 +25,7 @@ Estas marcas confirman decisiones de alcance, no funciones implementadas.
 - RF08: mostrar una evaluación orientativa, datos faltantes y actuaciones respaldadas por reglas y fuentes.
 - RF09: generar un informe imprimible con valores, tiempos, procedencias y referencias.
 - RF10: disponer de una demostración identificada como ficticia.
+- RF11: abrir directamente la captura al visitar la web, sin cuentas; separar el historial mediante un espacio anónimo de navegador.
 
 ## Límites del MVP
 

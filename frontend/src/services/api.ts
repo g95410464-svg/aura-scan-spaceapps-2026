@@ -6,6 +6,15 @@ export type Capture = { id: string; created_at: string; is_demo: boolean; image_
 export type Measurement = { id: string; capture_id: string; created_at: string; measured_at: string | null; subject_alias: string; device_type: string; is_demo: boolean; readings: Field[]; symptoms: string; assessment: { findings: string[]; next_steps: string[]; limitation: string; trends: { code: string; delta: number; unit: string }[] } };
 let csrf = '';
 export function setCsrf(value: string) { csrf = value; }
+let session: Promise<{ csrf: string; expires_at: number }> | null = null;
+export function resetSession() { session = null; csrf = ''; }
+export function ensureSession() {
+  // Share the bootstrap request, including React StrictMode's double mount.
+  if (!session) session = request<{ csrf: string; expires_at: number }>('/session')
+    .then(result => { setCsrf(result.csrf); return result; })
+    .catch(error => { session = null; throw error; });
+  return session;
+}
 export async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers);
   if (options.body && !(options.body instanceof FormData)) headers.set('Content-Type', 'application/json');

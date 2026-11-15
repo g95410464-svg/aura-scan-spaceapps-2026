@@ -4,12 +4,8 @@ import time
 from collections import defaultdict, deque
 from threading import Lock
 from fastapi import Depends, HTTPException, Request
-from argon2 import PasswordHasher
-from argon2.exceptions import VerificationError, InvalidHashError
-from sqlalchemy import select
-from backend.app.storage.models import AuthSession, User
+from backend.app.storage.models import BrowserSession, Workspace
 
-hasher = PasswordHasher(time_cost=2, memory_cost=19456, parallelism=1)
 _attempts = defaultdict(deque)
 _rate_lock = Lock()
 
@@ -38,19 +34,15 @@ def limit_attempts(request: Request, action: str, maximum: int, seconds: int):
         bucket.append(current)
 
 
-def verify_password(password, encoded):
-    try:
-        return hasher.verify(encoded,password)
-    except (VerificationError,InvalidHashError):
-        return False
-
-
-def authorize(request: Request, db=Depends(get_db)):
-    token=request.cookies.get('aura_session','')
-    auth=db.get(AuthSession,digest(token)) if token else None
+def get_workspace(request: Request, db=Depends(get_db)):
+    token=request.cookies.get('aura_browser','')
+    auth=db.get(BrowserSession,digest(token)) if token else None
     if auth is None or auth.expires_at<=int(time.time()):
-        raise HTTPException(401,'Inicia sesión para continuar.')
+        raise HTTPException(401,'El espacio de este navegador caducó. Actualiza la página para abrir uno nuevo automáticamente.')
     if request.method not in {'GET','HEAD','OPTIONS'}:
         if not secrets.compare_digest(request.headers.get('x-csrf-token',''),auth.csrf):
             raise HTTPException(403,'La sesión cambió. Actualiza la página antes de continuar.')
-    return db.scalar(select(User).where(User.id==auth.user_id))
+    workspace=db.get(Workspace,auth.workspace_id)
+    if workspace is None:
+        raise HTTPException(401,'No se pudo recuperar este espacio. Actualiza la página.')
+    return workspace

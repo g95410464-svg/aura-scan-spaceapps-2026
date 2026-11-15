@@ -48,7 +48,7 @@ Aceptación: el recorrido cámara → análisis → revisión funciona desde un 
 - [x] Registrar sujeto por alias, categoría del instrumento, unidad, hora de captura y hora de medición si se conoce.
 - [ ] Incorporar síntomas, antecedentes declarados y mediciones manuales con su procedencia (síntomas y transcripción manual implementados; antecedentes pendientes).
 - [x] Crear historial y un informe imprimible/exportable a PDF.
-- [x] Separar datos ficticios declarados de datos reales y limitar el acceso por usuario.
+- [x] Separar datos ficticios declarados de datos reales y aislar el acceso por espacio anónimo de navegador, sin cuentas.
 
 Aceptación: ninguna extracción pendiente alimenta una evaluación clínica. El informe permite rastrear cada dato hasta su captura y confirmación. Desconocer la hora de medición no se resuelve usando silenciosamente la hora de captura.
 
@@ -68,7 +68,7 @@ Aceptación: cada salida tiene reglas y fuentes rastreables. El sistema reconoce
 
 - [ ] Preparar despliegue reproducible del backend, frontend, base de datos y dependencias del OCR.
 - [ ] Configurar secretos fuera del repositorio, límites de acceso, retención y eliminación de capturas.
-- [ ] Verificar persistencia, aislamiento de usuarios, HTTPS, restauración de datos y errores de red.
+- [ ] Verificar persistencia, aislamiento de espacios de navegador, HTTPS, restauración de datos y errores de red.
 - [ ] Probar modelos compatibles en las condiciones de captura declaradas y navegadores objetivo.
 - [ ] Preparar una demo con datos ficticios: lectura correcta, lectura ilegible y corrección de OCR.
 - [ ] Publicar instrucciones de uso y limitaciones junto al enlace final.

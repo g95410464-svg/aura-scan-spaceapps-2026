@@ -1,13 +1,6 @@
-import re
 from datetime import datetime, timezone
 from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
 from backend.app.devices.catalog import DEVICES, FIELDS
-
-
-class Credentials(BaseModel):
-    model_config=ConfigDict(extra='forbid')
-    username: str = Field(min_length=3,max_length=40,pattern=r'^[a-zA-Z0-9_.-]+$')
-    password: str = Field(min_length=10,max_length=128)
 
 
 class Reading(BaseModel):

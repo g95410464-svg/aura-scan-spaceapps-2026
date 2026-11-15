@@ -1,10 +1,12 @@
 # Modelo de datos inicial
 
-Esquema conceptual propuesto. La versión 0.1 implementa usuarios, sesiones de acceso, capturas, mediciones y auditoría con SQLAlchemy; los perfiles clínicos, protocolos y relaciones avanzadas siguen pendientes. Ver `ESTADO.md`.
+Esquema conceptual propuesto. La versión 0.2 implementa espacios anónimos de navegador, sesiones automáticas, capturas, mediciones y auditoría con SQLAlchemy; los perfiles clínicos, protocolos y relaciones avanzadas siguen pendientes. Ver `ESTADO.md`.
 
 | Entidad | Campos principales |
 |---|---|
-| Usuarios y perfiles | Identidad, permisos, vínculo al astronauta; antecedentes declarados separados de diagnósticos verificados. |
+| Espacios de navegador | UUID y fecha de creación; agrupan evidencias sin cuentas ni contraseñas. |
+| Sesiones automáticas | Hash del token de cookie, espacio asociado, token CSRF y caducidad. |
+| Perfiles clínicos futuros | Alias y antecedentes declarados separados de diagnósticos verificados; no son cuentas de acceso. |
 | Modelos de instrumento | Fabricante/modelo, categoría, campos esperados, unidades admitidas, distribución de pantalla, estados de error/memoria y versión de compatibilidad. |
 | Sesiones de evaluación | Astronauta, autor, síntomas, contexto, inicio y estado. |
 | Capturas | Sesión, archivo privado, hora de captura, calidad, modelo candidato y versión del análisis. |
