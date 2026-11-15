@@ -40,3 +40,7 @@ Estas marcas confirman decisiones de alcance, no funciones implementadas.
 ## Evidencia de aceptación
 
 Conservar resultados de pruebas de reconocimiento por dispositivo, ejemplos de errores, capturas del recorrido publicado y trazabilidad del informe. Las métricas de rendimiento solo se anuncian después de medirlas.
+
+## Corrección de flujo confirmada el 15 de noviembre de 2026
+
+La cámara debe permanecer en vivo y registrar lecturas estables automáticamente, sin exigir tomar una foto. La versión 0.4 implementa ese registro como observación pendiente de revisión, visible en historial y asistente; la revisión posterior la convierte en medición confirmada.

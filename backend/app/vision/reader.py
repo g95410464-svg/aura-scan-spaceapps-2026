@@ -118,8 +118,12 @@ def parse_tokens(tokens: list[dict], selected_type: str = 'auto') -> dict:
 
 
 def analyze_image(path: Path, selected_type: str = 'auto') -> dict:
+    return analyze_bytes(path.read_bytes(), selected_type)
+
+
+def analyze_bytes(content: bytes, selected_type: str = 'auto') -> dict:
     global _engine
-    image=cv2.imdecode(np.frombuffer(path.read_bytes(),dtype=np.uint8),cv2.IMREAD_COLOR)
+    image=cv2.imdecode(np.frombuffer(content,dtype=np.uint8),cv2.IMREAD_COLOR)
     gray=cv2.cvtColor(image,cv2.COLOR_BGR2GRAY)
     with _lock:
         if _engine is None:

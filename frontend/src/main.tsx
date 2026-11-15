@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Activity, ArrowDownToLine, ArrowRight, Camera, Check, CheckCircle2, ChevronRight, ClipboardList, FileText, History, Info, LoaderCircle, Orbit, Plus, MessageCircle, ScanLine, ShieldCheck, Upload, X } from 'lucide-react';
+import { Activity, ArrowDownToLine, ArrowRight, Camera, Radio, Check, CheckCircle2, ChevronRight, ClipboardList, FileText, History, Info, LoaderCircle, Orbit, Plus, MessageCircle, ScanLine, ShieldCheck, Upload, X } from 'lucide-react';
 import { request, ensureSession, resetSession } from './services/api';
-import type { Capture, Device, Measurement } from './services/api';
+import type { Capture, Device, Measurement, LiveReading } from './services/api';
 import './styles.css';
 import { Assistant } from './features/assessments/Assistant';
+import { LiveMonitor, LiveReadings } from './features/capture/LiveMonitor';
 
 type Tab = 'capture' | 'history' | 'assistant';
 const labels: Record<string, string> = { systolic: 'Presión sistólica', diastolic: 'Presión diastólica', pulse: 'Pulso', spo2: 'Saturación SpO₂', temperature: 'Temperatura', glucose: 'Glucosa' };
@@ -27,17 +28,13 @@ function Report({ record, onNew, onAssistant }: { record: Measurement; onNew?: (
   </section>;
 }
 
-function CapturePage({ devices, onSaved, onFollowUp }: { devices: Device[]; onSaved: (m: Measurement) => void; onFollowUp: (m: Measurement) => void }) {
+function PhotoReview({ devices, onSaved, onFollowUp, initialCapture }: { devices: Device[]; onSaved: (m: Measurement) => void; onFollowUp: (m: Measurement) => void; initialCapture?: Capture | null }) {
   const [capture, setCapture] = useState<Capture | null>(null);
   const [record, setRecord] = useState<Measurement | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [selected, setSelected] = useState('auto');
   const [drafts, setDrafts] = useState<Record<string, { value: string; unit: string }>>({});
-  const [live, setLive] = useState(false);
-  const [cameraReady, setCameraReady] = useState(false);
-  const video = useRef<HTMLVideoElement>(null);
-  const stream = useRef<MediaStream | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const [subject, setSubject] = useState('');
   const [symptoms, setSymptoms] = useState('');
@@ -45,36 +42,21 @@ function CapturePage({ devices, onSaved, onFollowUp }: { devices: Device[]; onSa
   const [reviewed, setReviewed] = useState(false);
   const [declaredDemo, setDeclaredDemo] = useState(false);
   const device = devices.find(d => d.id === selected);
-  useEffect(() => { if (live && video.current) video.current.srcObject = stream.current; }, [live]);
-  useEffect(() => () => stream.current?.getTracks().forEach(t => t.stop()), []);
-  function stopCamera() { stream.current?.getTracks().forEach(t => t.stop()); stream.current = null; setLive(false); setCameraReady(false); }
-  async function startCamera() {
-    setError('');
-    if (!navigator.mediaDevices?.getUserMedia) { setError('La cámara necesita HTTPS o localhost y un navegador compatible. Puedes cargar una imagen.'); return; }
-    try { stream.current = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1600 } }, audio: false }); setLive(true); }
-    catch { setError('No se pudo abrir la cámara. Revisa los permisos o carga una imagen.'); }
-  }
+  useEffect(() => { if (initialCapture) applyCapture(initialCapture); }, [initialCapture]);
   function applyCapture(result: Capture) {
     setCapture(result); setReviewed(false); setRecord(null);
     setSelected(devices.some(d => d.id === result.device_type) ? result.device_type : selected);
     setDrafts(Object.fromEntries(result.fields.map(f => [f.code, { value: String(f.value), unit: f.unit ?? '' }])));
-    if (result.is_demo && !subject) setSubject('DEMO-01');
+    if (result.subject_alias) setSubject(result.subject_alias);
+    else if (result.is_demo && !subject) setSubject('DEMO-01');
   }
   async function analyze(file?: File) {
     if (file && file.size > 8 * 1024 * 1024) { setError('La imagen debe pesar como máximo 8 MB.'); return; }
-    setBusy(true); setError(''); stopCamera();
+    setBusy(true); setError('');
     try {
       if (!file) applyCapture(await request<Capture>('/captures/demo', { method: 'POST' }));
       else { const form = new FormData(); form.append('file', file); form.append('device_type', selected); form.append('is_demo', String(declaredDemo)); applyCapture(await request<Capture>('/captures', { method: 'POST', body: form })); }
     } catch (e) { setError(message(e)); } finally { setBusy(false); }
-  }
-  function takePhoto() {
-    const v = video.current;
-    if (!v?.videoWidth) return;
-    const canvas = document.createElement('canvas'); const scale = Math.min(1, 1600 / Math.max(v.videoWidth, v.videoHeight));
-    canvas.width = Math.round(v.videoWidth * scale); canvas.height = Math.round(v.videoHeight * scale);
-    canvas.getContext('2d')!.drawImage(v, 0, 0, canvas.width, canvas.height);
-    canvas.toBlob(blob => { if (blob) void analyze(new File([blob], 'captura.jpg', { type: 'image/jpeg' })); }, 'image/jpeg', .92);
   }
   async function confirm(e: React.FormEvent) {
     e.preventDefault(); if (!capture || !device) return;
@@ -85,17 +67,17 @@ function CapturePage({ devices, onSaved, onFollowUp }: { devices: Device[]; onSa
       setRecord(saved); onSaved(saved);
     } catch (e) { setError(message(e)); } finally { setBusy(false); }
   }
-  function reset() { stopCamera(); setCapture(null); setRecord(null); setReviewed(false); setDrafts({}); setError(''); }
+  function reset() { setCapture(null); setRecord(null); setReviewed(false); setDrafts({}); setError(''); }
   const phase = record ? 3 : capture ? 2 : 1;
-  return <><div className="page-heading"><div><span className="eyebrow">EVALUACIÓN / CAPTURA VISUAL</span><h1>Una captura.<br className="mobile-only" /> Un registro trazable.</h1><p>La cámara lee la pantalla. Tú confirmas qué se incorpora al historial.</p></div><span className="tag"><ScanLine size={14} /> OCR experimental</span></div>
+  return <><div className="page-heading"><div><span className="eyebrow">EVALUACIÓN / CAPTURA VISUAL</span><h1>Revisa la evidencia.<br className="mobile-only" /> Valida las lecturas.</h1><p>Revisa una observación automática o carga una imagen como alternativa.</p></div><span className="tag"><ScanLine size={14} /> OCR experimental</span></div>
     <div className="phase-bar">{['Captura del instrumento', 'Revisión de lecturas', 'Informe y seguimiento'].map((s, i) => <div className={phase === i + 1 ? 'active' : phase > i + 1 ? 'complete' : ''} key={s}><span>{phase > i + 1 ? <Check size={14} /> : `0${i + 1}`}</span>{s}{i < 2 && <ChevronRight size={16} />}</div>)}</div>
     {error && <div className="notice error" role="alert"><Info size={17} />{error}</div>}
     {record ? <Report record={record} onNew={reset} onAssistant={() => onFollowUp(record)} /> : <div className="capture-layout"><section className="capture-panel"><div className="panel-title compact"><div><h2>{capture ? 'Evidencia de la lectura' : 'Enfoca la pantalla'}</h2><p>{capture ? date(capture.created_at) : 'Buena luz, sin reflejos y con etiquetas visibles.'}</p></div><Camera size={20} /></div>
       <div className={`viewfinder ${capture ? 'has-image' : ''}`}>
-        {live ? <video ref={video} autoPlay playsInline muted onLoadedMetadata={() => setCameraReady(true)} /> : capture ? <img src={capture.image_url} alt="Pantalla capturada del instrumento, para revisar los valores extraídos" /> : <><div className="scan-corners"><ScanLine size={62} strokeWidth={1} /><span>Coloca el instrumento<br />dentro del encuadre</span></div><div className="viewfinder-bottom"><span className="status-dot" /> CÁMARA EN ESPERA</div></>}
+        {capture ? <img src={capture.image_url} alt="Pantalla capturada del instrumento, para revisar los valores extraídos" /> : <><div className="scan-corners"><ScanLine size={62} strokeWidth={1} /><span>Coloca el instrumento<br />dentro del encuadre</span></div><div className="viewfinder-bottom"><span className="status-dot" /> CÁMARA EN ESPERA</div></>}
         {capture?.is_demo && <span className="demo-overlay">DATOS FICTICIOS</span>}{busy && <div className="processing" role="status"><LoaderCircle className="spin" size={34} /><strong>Procesando imagen</strong><span>Buscando dígitos, etiquetas y unidades…</span></div>}
       </div>
-      <div className="capture-controls">{live ? <><button className="button primary" disabled={!cameraReady || busy} onClick={takePhoto}><Camera size={17} /> Tomar captura</button><button className="button secondary" onClick={stopCamera}>Cerrar cámara</button></> : <><button className="button primary" disabled={busy} onClick={startCamera}><Camera size={17} /> {capture ? 'Repetir con cámara' : 'Abrir cámara'}</button><button className="button secondary" disabled={busy} onClick={() => fileInput.current?.click()}><Upload size={17} /> Cargar imagen</button></>}</div>
+      <div className="capture-controls"><button className="button secondary" disabled={busy} onClick={() => fileInput.current?.click()}><Upload size={17} /> Cargar imagen alternativa</button></div>
       <input className="visually-hidden" ref={fileInput} type="file" accept="image/jpeg,image/png,image/webp" aria-label="Seleccionar imagen del instrumento" onChange={e => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void analyze(file); }} />
       <div className="capture-note"><ShieldCheck size={17} /><span>PNG, JPG o WebP · Hasta 8 MB y 12 megapíxeles. La imagen queda vinculada al espacio de este navegador.</span></div>
       {!capture && <div className="demo-box"><div><strong>Explora antes de capturar</strong><p>Prueba el OCR con una pantalla generada y datos ficticios.</p></div><button className="text-button" disabled={busy} onClick={() => void analyze()}>Usar demostración <ArrowRight size={16} /></button></div>}
@@ -107,7 +89,7 @@ function CapturePage({ devices, onSaved, onFollowUp }: { devices: Device[]; onSa
         {capture.warnings.map((w, i) => <div className="notice small" key={i}>{w}</div>)}
         {device ? <div className="field-list">{device.indicators.map(indicator => { const draft = drafts[indicator.code] ?? { value: '', unit: '' }; const candidate = capture.fields.find(f => f.code === indicator.code); return <div className="field-row" key={indicator.code}><label>{indicator.label}{device.required.includes(indicator.code) && ' *'}<input aria-label={indicator.label} type="number" step="any" min={-1000} max={10000} required={device.required.includes(indicator.code)} value={draft.value} placeholder="Sin lectura" disabled={busy} onChange={e => { setDrafts({ ...drafts, [indicator.code]: { ...draft, value: e.target.value } }); setReviewed(false); }} /></label><label>Unidad<select aria-label={`Unidad de ${indicator.label}`} value={draft.unit} required={!!draft.value || device.required.includes(indicator.code)} disabled={busy} onChange={e => { setDrafts({ ...drafts, [indicator.code]: { ...draft, unit: e.target.value } }); setReviewed(false); }}><option value="">Selecciona</option>{indicator.units.map(u => <option key={u}>{u}</option>)}</select></label><small>{candidate ? `Lectura propuesta por OCR · Revisar con la imagen` : 'Campo sin extraer · Introducción manual'}</small></div>; })}</div> : <div className="notice">Selecciona un tipo de instrumento para completar los campos.</div>}
         <label>Alias del astronauta<input value={subject} onChange={e => { setSubject(e.target.value); setReviewed(false); }} maxLength={80} placeholder="ej. ASTRO-01" required disabled={busy} /></label>
-        <label>Hora de la medición <small>(opcional, hora local)</small><input type="datetime-local" value={measuredAt} onChange={e => { setMeasuredAt(e.target.value); setReviewed(false); }} disabled={busy} /></label><p className="input-hint">Déjala vacía si solo conoces cuándo tomaste la fotografía.</p>
+        <label>Hora de la medición <small>(opcional, hora local)</small><input type="datetime-local" value={measuredAt} onChange={e => { setMeasuredAt(e.target.value); setReviewed(false); }} disabled={busy} /></label><p className="input-hint">Déjala vacía si no conoces cuándo se realizó la medición.</p>
         <label>Síntomas y contexto <small>(opcional)</small><textarea value={symptoms} onChange={e => { setSymptoms(e.target.value); setReviewed(false); }} rows={3} maxLength={2000} placeholder="Cómo se siente, condiciones de la medición…" disabled={busy} /></label>
         <label className="checkbox"><input type="checkbox" checked={reviewed} onChange={e => setReviewed(e.target.checked)} required disabled={busy} /><span>Revisé los valores, las unidades y el modo de la pantalla. Confirmo a quién corresponde el registro.</span></label>
         <button className="button primary full" disabled={busy || !device || !reviewed}>{busy ? <LoaderCircle className="spin" size={17} /> : <CheckCircle2 size={17} />} Confirmar y generar informe</button>
@@ -125,10 +107,14 @@ function App() {
   const [assistantSubject, setAssistantSubject] = useState('');
   const [assistantDemo, setAssistantDemo] = useState(false);
   const [records, setRecords] = useState<Measurement[]>([]);
+  const [automatic, setAutomatic] = useState<LiveReading[]>([]);
+  const [captureMode, setCaptureMode] = useState<'live' | 'review'>('live');
+  const [reviewCapture, setReviewCapture] = useState<Capture | null>(null);
+  const [reviewLoading, setReviewLoading] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<Measurement | null>(null);
   const [error, setError] = useState('');
   useEffect(() => {
-    const expired = () => { resetSession(); setLoading(true); setRecords([]); setSelectedRecord(null); setTab('capture'); setSessionGeneration(g => g + 1); };
+    const expired = () => { resetSession(); setLoading(true); setRecords([]); setAutomatic([]); setReviewCapture(null); setCaptureMode('live'); setSelectedRecord(null); setTab('capture'); setSessionGeneration(g => g + 1); };
     window.addEventListener('aura-session-expired', expired);
     return () => window.removeEventListener('aura-session-expired', expired);
   }, []);
@@ -137,19 +123,25 @@ function App() {
     setBootError('');
     void ensureSession().then(async () => {
       if (!active) return;
-      const [d, h] = await Promise.all([request<{ devices: Device[] }>('/devices'), request<{ items: Measurement[] }>('/measurements')]);
-      if (active) { setDevices(d.devices); setRecords(h.items); }
+      const [d, h, a] = await Promise.all([request<{ devices: Device[] }>('/devices'), request<{ items: Measurement[] }>('/measurements'), request<{ items: LiveReading[] }>('/live/readings')]);
+      if (active) { setDevices(d.devices); setRecords(h.items); setAutomatic(a.items); }
     }).catch(e => { if (active) setBootError(message(e)); }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [sessionGeneration]);
-  function followUp(record: Measurement) { setAssistantSubject(record.subject_alias); setAssistantDemo(record.is_demo); setTab('assistant'); }
+  function followUp(record: Pick<Measurement, 'subject_alias' | 'is_demo'>) { setAssistantSubject(record.subject_alias); setAssistantDemo(record.is_demo); setTab('assistant'); }
+  async function reviewAutomatic(item: LiveReading) {
+    setTab('capture'); setCaptureMode('review'); setReviewLoading(true); setReviewCapture(null); setError('');
+    try { setReviewCapture(await request<Capture>(`/captures/${item.capture_id}`)); }
+    catch(e) { setError(message(e)); } finally { setReviewLoading(false); }
+  }
+  function saveMeasurement(record: Measurement) { setRecords(previous=>[record,...previous]); setAutomatic(previous=>previous.filter(r=>r.capture_id!==record.capture_id)); }
   if (loading) return <div className="loading-screen"><Orbit size={40} className="slow-spin" /><span>Preparando el sistema…</span></div>;
   if (bootError) return <div className="loading-screen"><Info size={32} /><span>{bootError}</span><button className="button primary" onClick={() => { setLoading(true); setSessionGeneration(g => g + 1); }}>Reintentar</button></div>;
-  return <div className="app-shell"><aside className="sidebar"><Brand light /><div className="mission-label"><span className="status-dot" /> SALUD DE MISIÓN</div><nav aria-label="Navegación principal">{([{ id: 'capture', name: 'Nueva evaluación', icon: ScanLine }, { id: 'history', name: 'Historial', icon: History }, { id: 'assistant', name: 'Asistente de salud', icon: MessageCircle }] as const).map(item => <button key={item.id} className={tab === item.id ? 'active' : ''} onClick={() => { setTab(item.id); setError(''); }}><item.icon size={19} />{item.name}{tab === item.id && <span className="nav-dot" />}</button>)}</nav><div className="sidebar-note"><Orbit size={30} strokeWidth={1} /><strong>La evidencia primero.</strong><p>Cada lectura conserva su procedencia y requiere tu confirmación.</p><span>SPACE APPS / 2026</span></div><div className="workspace-status"><ShieldCheck size={19} /><div><strong>Acceso directo</strong><small>Espacio de este navegador</small></div></div></aside>
-    <div className="main-shell"><header className="topbar"><div><span>Centro de salud</span><ChevronRight size={14} /><strong>{tab === 'capture' ? 'Evaluación' : tab === 'history' ? 'Historial' : 'Asistente de salud'}</strong></div><span className="topbar-status"><span className="status-dot" /> Prototipo 0.3</span></header><main className="workspace">{error && <div className="notice error" role="alert">{error}<button aria-label="Cerrar aviso" onClick={() => setError('')}><X size={16} /></button></div>}
-      {tab === 'capture' && <CapturePage devices={devices} onSaved={record => setRecords(previous => [record, ...previous])} onFollowUp={followUp} />}
-      {tab === 'history' && <><div className="page-heading"><div><span className="eyebrow">CONTINUIDAD / EVIDENCIA</span><h1>El contexto se construye<br />lectura a lectura.</h1><p>{records.length} registros confirmados en este navegador.</p></div><button className="button primary" onClick={() => setTab('capture')}><Plus size={17} /> Nueva evaluación</button></div>{records.length === 0 ? <div className="empty-state"><History size={40} strokeWidth={1} /><h2>Tu historial empieza con una lectura.</h2><p>Las capturas pendientes no se añaden al informe hasta que las confirmes.</p><button className="button secondary" onClick={() => setTab('capture')}>Ir a captura <ArrowRight size={16} /></button></div> : <><div className="history-list">{records.map(record => <button className={selectedRecord?.id === record.id ? 'history-row selected' : 'history-row'} onClick={() => setSelectedRecord(record)} key={record.id}><span className="history-icon"><FileText size={20} /></span><span><strong>{record.subject_alias}</strong><small>{devices.find(d => d.id === record.device_type)?.label ?? record.device_type}</small></span><span className="history-values">{record.readings.map(r => `${r.value} ${r.unit}`).join(' · ')}</span><span><small>{date(record.created_at)}</small>{record.is_demo && <b className="demo-tag">Ficticio</b>}</span><ChevronRight size={17} /></button>)}</div>{selectedRecord && <Report record={selectedRecord} onAssistant={() => followUp(selectedRecord)} />}</> }</>}
-      {tab === 'assistant' && <Assistant initialSubject={assistantSubject} initialDemo={assistantDemo} onCapture={() => setTab('capture')} />}
+  return <div className="app-shell"><aside className="sidebar"><Brand light /><div className="mission-label"><span className="status-dot" /> SALUD DE MISIÓN</div><nav aria-label="Navegación principal">{([{ id: 'capture', name: 'Cámara en vivo', icon: Radio }, { id: 'history', name: 'Historial', icon: History }, { id: 'assistant', name: 'Asistente de salud', icon: MessageCircle }] as const).map(item => <button key={item.id} className={tab === item.id ? 'active' : ''} onClick={() => { setTab(item.id); setError(''); }}><item.icon size={19} />{item.name}{tab === item.id && <span className="nav-dot" />}</button>)}</nav><div className="sidebar-note"><Orbit size={30} strokeWidth={1} /><strong>La evidencia primero.</strong><p>Registro automático en vivo, con evidencia y revisión posterior.</p><span>SPACE APPS / 2026</span></div><div className="workspace-status"><ShieldCheck size={19} /><div><strong>Acceso directo</strong><small>Espacio de este navegador</small></div></div></aside>
+    <div className="main-shell"><header className="topbar"><div><span>Centro de salud</span><ChevronRight size={14} /><strong>{tab === 'capture' ? 'Evaluación' : tab === 'history' ? 'Historial' : 'Asistente de salud'}</strong></div><span className="topbar-status"><span className="status-dot" /> Prototipo 0.4</span></header><main className="workspace">{error && <div className="notice error" role="alert">{error}<button aria-label="Cerrar aviso" onClick={() => setError('')}><X size={16} /></button></div>}
+      {tab === 'capture' && <><div className="capture-mode-tabs" aria-label="Modo de lectura"><button className={captureMode==='live'?'active':''} onClick={()=>{setCaptureMode('live');setReviewCapture(null);}}><Radio size={15}/> Cámara en vivo</button><button className={captureMode==='review'?'active':''} onClick={()=>setCaptureMode('review')}><ClipboardList size={15}/> Revisión / imagen alternativa</button></div>{reviewLoading?<div className="assistant-loading"><LoaderCircle className="spin" size={22}/>Abriendo evidencia…</div>:captureMode==='live'?<LiveMonitor devices={devices} pending={automatic} onSaved={item=>setAutomatic(previous=>previous.some(r=>r.id===item.id)?previous:[item,...previous])} onReview={item=>void reviewAutomatic(item)} onFollowUp={followUp}/>:<PhotoReview key={reviewCapture?.id??'file'} devices={devices} initialCapture={reviewCapture} onSaved={saveMeasurement} onFollowUp={followUp}/>}</>}
+      {tab === 'history' && <><div className="page-heading"><div><span className="eyebrow">CONTINUIDAD / EVIDENCIA</span><h1>El contexto se construye<br />lectura a lectura.</h1><p>{records.length} mediciones confirmadas · {automatic.length} lecturas automáticas sin revisar en este navegador.</p></div><button className="button primary" onClick={() => setTab('capture')}><Plus size={17} /> Nueva evaluación</button></div>{automatic.length>0&&<section className="history-automatic"><div className="section-heading"><h2><Radio size={18}/> Lecturas automáticas guardadas</h2><span className="eyebrow">SIN REVISAR</span></div><p className="input-hint">El sistema las registró en vivo. Revisa la evidencia para incorporarlas a las mediciones confirmadas.</p><LiveReadings items={automatic} onReview={item=>void reviewAutomatic(item)} onFollowUp={followUp}/></section>}{records.length === 0 ? <div className="empty-state"><History size={40} strokeWidth={1} /><h2>{automatic.length?'Las lecturas en vivo ya están guardadas.':'Tu historial empieza con una lectura.'}</h2><p>Revisa su evidencia para incorporarlas a las mediciones confirmadas y sus informes.</p><button className="button secondary" onClick={() => setTab('capture')}>Ir a captura <ArrowRight size={16} /></button></div> : <><div className="history-list">{records.map(record => <button className={selectedRecord?.id === record.id ? 'history-row selected' : 'history-row'} onClick={() => setSelectedRecord(record)} key={record.id}><span className="history-icon"><FileText size={20} /></span><span><strong>{record.subject_alias}</strong><small>{devices.find(d => d.id === record.device_type)?.label ?? record.device_type}</small></span><span className="history-values">{record.readings.map(r => `${r.value} ${r.unit}`).join(' · ')}</span><span><small>{date(record.created_at)}</small>{record.is_demo && <b className="demo-tag">Ficticio</b>}</span><ChevronRight size={17} /></button>)}</div>{selectedRecord && <Report record={selectedRecord} onAssistant={() => followUp(selectedRecord)} />}</> }</>}
+      {tab === 'assistant' && <Assistant initialSubject={assistantSubject} initialDemo={assistantDemo} onCapture={() => { setCaptureMode('live'); setTab('capture'); }} onReview={item=>void reviewAutomatic(item)} />}
       <footer className="workspace-footer"><span>AURA SCAN · CAPTURA, CONFIRMACIÓN Y SEGUIMIENTO</span><span>Uso experimental · Sin validación clínica</span></footer>
     </main></div></div>;
 }

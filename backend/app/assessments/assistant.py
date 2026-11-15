@@ -64,7 +64,7 @@ def build_assistant(records, contexts, subject_alias, is_demo, intent='overview'
             observations.append('Hay síntomas o contexto declarados en mediciones previas. Se conservan en la cronología para revisión médica.')
     else:
         gaps.append('Todavía no hay mediciones confirmadas para este alias y tipo de datos.')
-        recommend('first','Incorpora la primera lectura','Fotografía la pantalla del instrumento, revisa etiquetas, valores y unidades y confirma el alias antes de guardarla.',
+        recommend('first','Incorpora la primera lectura','Inicia la cámara en vivo con el alias del astronauta. Las lecturas estables se guardan solas; revisa su evidencia para incorporarlas a las mediciones confirmadas.',
                   'El asistente solo utiliza lecturas que una persona ha revisado.',['nasa-research'])
     if 'spo2' in codes:
         recommend('oxygen','Revisa la calidad de SpO₂','Sigue el manual del pulsioxímetro y registra cómo te sientes. Si la lectura o los síntomas preocupan, consulta al responsable médico; no te guíes solo por el porcentaje.',

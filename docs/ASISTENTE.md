@@ -39,3 +39,5 @@ Las referencias se consultaron el 14 de noviembre de 2026. Los enlaces originale
 Sin cuentas ni login. Cookie HttpOnly/SameSite con 30 días por defecto (`AURA_SESSION_HOURS=720`); al abrir la web se renueva si queda menos de la mitad. Una cookie perdida o caducada no permite recuperar el espacio. Los datos siguen separados entre navegadores y no hay recuperación entre dispositivos.
 
 Se añadió un volumen Railway de 500 MB en `/aura-data`, destinado a SQLite y capturas. No recupera datos de despliegues previos en almacenamiento efímero. Antes de usar datos médicos reales faltan revisión clínica, política de retención y borrado, restauración probada y una estrategia de continuidad entre dispositivos.
+
+Desde la versión 0.4, el asistente también muestra las observaciones guardadas automáticamente por la cámara en vivo en una sección sin revisar. Sus valores no alimentan las comparaciones de mediciones confirmadas hasta la revisión de evidencia. Véase `LECTURA_EN_VIVO.md`.

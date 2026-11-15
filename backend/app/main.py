@@ -5,15 +5,16 @@ from fastapi import FastAPI, Request, Response, Depends, HTTPException, UploadFi
 from typing import Literal
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import create_engine, select, delete, event
+from sqlalchemy import create_engine, select, delete, event, update
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import IntegrityError
 from backend.app.core.settings import Settings
 from backend.app.core.security import get_workspace, get_db, limit_attempts, digest, origin_key
-from backend.app.storage.models import Base, Workspace, BrowserSession, Capture, Measurement, AuditEvent, HealthContext
+from backend.app.storage.models import Base, Workspace, BrowserSession, Capture, Measurement, AuditEvent, HealthContext, LiveSession, LiveReading, now_iso
 from backend.app.measurements.schemas import Confirmation
 from backend.app.devices.catalog import catalog, DEVICES
-from backend.app.vision.reader import sanitize_image, analyze_image, ImageRejected
+from backend.app.vision.reader import sanitize_image, analyze_image, analyze_bytes, ImageRejected
+from backend.app.vision.live import LiveStart, advance, serialize_live, INTERVAL_MS, MIN_FRAMES
 from backend.app.vision.demo import demo_image
 from backend.app.assessments.evaluate import evaluate
 from backend.app.assessments.assistant import build_assistant
@@ -35,7 +36,7 @@ def create_app(settings: Settings | None = None):
         Base.metadata.create_all(engine)
         yield
         engine.dispose()
-    app=FastAPI(title='AURA Scan',version='0.3.0',lifespan=lifespan,docs_url=None,redoc_url=None,
+    app=FastAPI(title='AURA Scan',version='0.4.0',lifespan=lifespan,docs_url=None,redoc_url=None,
                 description='Captura visual experimental de instrumentos. Sin diagnóstico clínico validado.')
     app.state.db_session=sessionmaker(engine,expire_on_commit=False)
     app.state.settings=config
@@ -55,7 +56,7 @@ def create_app(settings: Settings | None = None):
                 return JSONResponse({'detail':'El archivo excede el límite de 8 MB.'},status_code=413)
         except ValueError:
             return JSONResponse({'detail':'Tamaño de solicitud inválido.'},status_code=400)
-        if request.url.path=='/api/captures' and request.method=='POST' and length is None:
+        if (request.url.path=='/api/captures' or request.url.path.endswith('/frames')) and request.method=='POST' and length is None:
             return JSONResponse({'detail':'La carga requiere Content-Length.'},status_code=411)
         response=await call_next(request)
         response.headers['X-Content-Type-Options']='nosniff'
@@ -68,7 +69,7 @@ def create_app(settings: Settings | None = None):
 
     @app.get('/api/health')
     def health():
-        return {'status':'ok','version':'0.3.0','clinical_validation':False,'dataset_integrated':False}
+        return {'status':'ok','version':'0.4.0','clinical_validation':False,'dataset_integrated':False}
 
     @app.get('/api/session')
     def browser_session(request: Request,response: Response,db=Depends(get_db)):
@@ -152,6 +153,100 @@ def create_app(settings: Settings | None = None):
         item=owner_capture(capture_id,workspace,db)
         return FileResponse(config.storage_dir/f'{item.id}.png',media_type='image/png')
 
+    @app.get('/api/captures/{capture_id}')
+    def capture_detail(capture_id: str,workspace=Depends(get_workspace),db=Depends(get_db)):
+        item=owner_capture(capture_id,workspace,db)
+        automatic=db.scalar(select(LiveReading).where(LiveReading.capture_id==item.id,LiveReading.owner_id==workspace.id))
+        return {'id':item.id,'created_at':item.created_at,'is_demo':item.is_demo,'status':item.status,
+                'image_url':f'/api/captures/{item.id}/image','subject_alias':automatic.subject_alias if automatic else None,**item.result}
+
+    def own_live(session_id,workspace,db):
+        item=db.scalar(select(LiveSession).where(LiveSession.id==session_id,LiveSession.owner_id==workspace.id))
+        if not item: raise HTTPException(404,'Sesión de lectura no encontrada.')
+        return item
+
+    @app.post('/api/live/sessions',status_code=201)
+    def start_live(data: LiveStart,request: Request,workspace=Depends(get_workspace),db=Depends(get_db)):
+        limit_attempts(request,'live_start',30,3600)
+        item=LiveSession(owner_id=workspace.id,subject_alias=data.subject_alias,device_type=data.device_type,
+                         is_demo=data.is_demo,expires_at=int(time.time())+7200)
+        db.add(item);db.commit()
+        return {'id':item.id,'interval_ms':INTERVAL_MS,'stable_frames':MIN_FRAMES,'expires_at':item.expires_at}
+
+    @app.get('/api/live/demo-screen')
+    def live_demo_screen(workspace=Depends(get_workspace)):
+        return Response(demo_image(),media_type='image/png')
+
+    @app.post('/api/live/{session_id}/stop')
+    def stop_live(session_id: str,workspace=Depends(get_workspace),db=Depends(get_db)):
+        item=own_live(session_id,workspace,db)
+        if not item.stopped_at:
+            item.stopped_at=now_iso();db.commit()
+        return {'status':'stopped'}
+
+    @app.post('/api/live/{session_id}/frames')
+    def live_frame(session_id: str,request: Request,file: UploadFile=File(...),sequence: int=Form(...,ge=1,le=1000000),
+                   workspace=Depends(get_workspace),db=Depends(get_db)):
+        item=own_live(session_id,workspace,db)
+        if item.stopped_at or item.expires_at<=int(time.time()):
+            raise HTTPException(409,'La lectura en vivo terminó. Inicia una nueva sesión.')
+        if sequence==item.sequence and item.state.get('response'):
+            return item.state['response']
+        if sequence<item.sequence: raise HTTPException(409,'Fotograma anterior al último procesado.')
+        if item.state.get('received_at',0)>time.time()-1:
+            raise HTTPException(429,'Espera antes del siguiente fotograma.')
+        limit_attempts(request,'live_frame',60,60)
+        content=file.file.read(2*1024*1024+1)
+        if len(content)>2*1024*1024: raise HTTPException(413,'El fotograma excede 2 MB.')
+        try:
+            normalized=sanitize_image(content)
+        except ImageRejected as exc:
+            raise HTTPException(422,str(exc))
+        try:
+            result=analyze_bytes(normalized,item.device_type)
+        except Exception:
+            raise HTTPException(503,'No se pudo analizar el fotograma. La lectura se ha pausado; vuelve a iniciarla.')
+        detected_demo=item.is_demo or any('FICTICIO' in t['text'].upper() or 'DEMO' in t['text'].upper() for t in result.get('tokens',[]))
+        now=time.time()
+        state,response,should_save=advance(item.state,result,now,detected_demo)
+        response.update(sequence=sequence,recording=None,is_demo=detected_demo)
+        state['received_at']=now
+        expected=item.sequence
+        # Conditional update makes retries and simultaneous requests safe across workers.
+        claimed=db.execute(update(LiveSession).where(LiveSession.id==item.id,LiveSession.sequence==expected,
+                            LiveSession.stopped_at.is_(None)).values(sequence=sequence,state=state),execution_options={'synchronize_session':False})
+        if claimed.rowcount!=1:
+            db.rollback();raise HTTPException(409,'Otro fotograma ya fue procesado; continúa con el siguiente.')
+        path=None
+        try:
+            if should_save:
+                readings=[{'code':r['code'],'value':r['value'],'unit':r['unit'],'provenance':'live_ocr_unreviewed'} for r in response['fields']]
+                capture=Capture(owner_id=workspace.id,device_type=result['device_type'],result={**result,'origin':'live_camera'},is_demo=detected_demo)
+                db.add(capture);db.flush()
+                path=config.storage_dir/f'{capture.id}.png'
+                path.write_bytes(normalized)
+                observation=LiveReading(owner_id=workspace.id,session_id=item.id,capture_id=capture.id,sequence=sequence,
+                                        subject_alias=item.subject_alias,device_type=result['device_type'],is_demo=detected_demo,readings=readings)
+                db.add(observation)
+                db.add(AuditEvent(owner_id=workspace.id,capture_id=capture.id,action='live_auto_saved',detail={
+                    'session_id':item.id,'sequence':sequence,'agreement_frames':response['count'],'human_reviewed':False,'readings':readings}))
+                db.flush()
+                response['recording']=serialize_live(observation)
+            state['response']=response
+            db.execute(update(LiveSession).where(LiveSession.id==item.id).values(state=state),execution_options={'synchronize_session':False})
+            db.commit()
+        except Exception:
+            db.rollback()
+            if path and path.exists(): path.unlink()
+            raise
+        return response
+
+    @app.get('/api/live/readings')
+    def live_readings(workspace=Depends(get_workspace),db=Depends(get_db)):
+        rows=db.scalars(select(LiveReading).where(LiveReading.owner_id==workspace.id,LiveReading.status=='pending')
+                        .order_by(LiveReading.created_at.desc()).limit(100)).all()
+        return {'items':[serialize_live(row) for row in rows]}
+
     @app.post('/api/captures/{capture_id}/confirm',status_code=201)
     def confirm(capture_id: str,data: Confirmation,workspace=Depends(get_workspace),db=Depends(get_db)):
         capture=owner_capture(capture_id,workspace,db)
@@ -171,6 +266,8 @@ def create_app(settings: Settings | None = None):
                            readings=readings,symptoms=data.symptoms,assessment=assessment)
         db.add(record)
         capture.status='confirmed'
+        automatic=db.scalar(select(LiveReading).where(LiveReading.capture_id==capture.id,LiveReading.owner_id==workspace.id))
+        if automatic: automatic.status='confirmed'
         db.add(AuditEvent(owner_id=workspace.id,capture_id=capture.id,action='confirmed',
                           detail={'candidates':capture.result.get('fields',[]),'confirmed':readings,'device_type':data.device_type}))
         try:
@@ -191,6 +288,7 @@ def create_app(settings: Settings | None = None):
     def subjects(workspace=Depends(get_workspace),db=Depends(get_db)):
         rows = db.execute(select(Measurement.subject_alias, Measurement.is_demo).where(Measurement.owner_id==workspace.id).distinct()).all()
         rows += db.execute(select(HealthContext.subject_alias, HealthContext.is_demo).where(HealthContext.owner_id==workspace.id).distinct()).all()
+        rows += db.execute(select(LiveReading.subject_alias, LiveReading.is_demo).where(LiveReading.owner_id==workspace.id).distinct()).all()
         return {'items':[{'subject_alias':alias,'is_demo':demo} for alias,demo in sorted(set(rows))]}
 
     @app.get('/api/assistant')
@@ -203,7 +301,18 @@ def create_app(settings: Settings | None = None):
                            Measurement.is_demo==is_demo).order_by(Measurement.created_at.desc()).limit(500)).all()
         contexts=db.scalars(select(HealthContext).where(HealthContext.owner_id==workspace.id,HealthContext.subject_alias==alias,
                             HealthContext.is_demo==is_demo).order_by(HealthContext.created_at.desc()).limit(50)).all()
-        return build_assistant(records,contexts,alias,is_demo,intent)
+        data=build_assistant(records,contexts,alias,is_demo,intent)
+        automatic=db.scalars(select(LiveReading).where(LiveReading.owner_id==workspace.id,LiveReading.subject_alias==alias,
+                            LiveReading.is_demo==is_demo,LiveReading.status=='pending').order_by(LiveReading.created_at.desc()).limit(100)).all()
+        data['automatic_readings']=[serialize_live(row) for row in automatic]
+        if automatic:
+            data['observations'].append(f'Hay {len(automatic)} lecturas automáticas guardadas sin revisión; se muestran por separado y no alimentan las comparaciones confirmadas.')
+            data['recommendations'].insert(0,{'id':'review_live','title':'Revisa las lecturas automáticas',
+                'action':'Contrasta las lecturas guardadas con su evidencia antes de validarlas para el seguimiento médico.',
+                'reason':'La coincidencia de OCR entre fotogramas no demuestra precisión del instrumento ni de la medición.',
+                'source_ids':['nasa-research'],'priority':'follow_up'})
+            data['recommendations'].sort(key=lambda recommendation:recommendation['priority']!='urgent')
+        return data
 
     @app.post('/api/assistant/context',status_code=201)
     def save_context(data: ContextInput,request: Request,workspace=Depends(get_workspace),db=Depends(get_db)):

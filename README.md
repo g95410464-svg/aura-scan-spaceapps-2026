@@ -1,8 +1,8 @@
 # AURA Scan
 
-Primera versión ejecutable de una web de captura visual de instrumentos médicos para el reto de salud espacial de NASA Space Apps 2026. Nombre de trabajo; sin afiliación ni aprobación de NASA.
+Prototipo ejecutable de una web de lectura visual en vivo de instrumentos médicos para el reto de salud espacial de NASA Space Apps 2026. Nombre de trabajo; sin afiliación ni aprobación de NASA.
 
-**Estado 0.3:** interfaz React/TypeScript, API FastAPI, OCR real en Python, confirmación de lecturas, historial privado e informes PDF. Aplicación publicada en Railway; repositorio público.
+**Estado 0.4:** interfaz React/TypeScript, API FastAPI, OCR real en Python, confirmación de lecturas, historial privado e informes PDF. Aplicación publicada en Railway; repositorio público.
 
 Web: https://aura-scan-spaceapps-2026-production.up.railway.app/
 
@@ -10,8 +10,10 @@ Repositorio: https://github.com/g95410464-svg/aura-scan-spaceapps-2026
 
 ## Qué funciona
 
-- Acceso directo a captura al abrir la web, sin registro, contraseña ni inicio de sesión. Un espacio anónimo por navegador se prepara automáticamente con cookie HttpOnly.
-- Captura desde cámara o carga de PNG/JPEG/WebP, hasta 8 MB y 12 megapíxeles.
+- Acceso directo a cámara en vivo al abrir la web, sin registro, contraseña ni inicio de sesión. Un espacio anónimo por navegador se prepara automáticamente con cookie HttpOnly.
+- Cámara continua con registro automático de lecturas estables, deduplicación y evidencia. No requiere disparar fotos manualmente.
+- Observaciones automáticas sin revisar separadas de las mediciones confirmadas; ambas aparecen en el historial y el asistente.
+- Carga de imagen alternativa de PNG/JPEG/WebP, hasta 8 MB y 12 megapíxeles; fotogramas en vivo hasta 2 MB.
 - OCR con RapidOCR/ONNX y OpenCV, seguido de asociación por etiquetas y unidades visibles.
 - Campos de tensiómetro, pulsioxímetro, termómetro, glucómetro y reloj inteligente declarado manualmente; son categorías experimentales, no modelos físicos certificados.
 - Revisión y corrección antes de confirmar. Se conservan candidatos originales y auditoría.
@@ -40,11 +42,11 @@ cd ..
 
 En Linux/macOS, sustituir `.\.venv\Scripts\python.exe` por `.venv/bin/python`.
 
-Abrir http://127.0.0.1:8000, pulsar **Usar demostración**. El visitante de la web publicada solo abre el enlace; estos comandos son para desarrollo.
+Abrir http://127.0.0.1:8000, abrir **Probar el flujo continuo sin usar una cámara** y pulsar **Iniciar señal simulada**. El visitante de la web publicada solo abre el enlace; estos comandos son para desarrollo.
 
 ### Acceso directo e historial
 
-La primera pantalla es la captura. No hay cuentas, registro, contraseña ni botón de entrada. El navegador recibe automáticamente un espacio privado con una cookie de 30 días por defecto, renovable al abrir la web mientras siga vigente. Al caducar o borrar la cookie se abre un espacio nuevo; el historial anterior no se recupera desde la interfaz ni se sincroniza entre dispositivos. Descargar el PDF permite conservar una copia del informe.
+La primera pantalla es la cámara en vivo. No hay cuentas, registro, contraseña ni botón de entrada. El navegador recibe automáticamente un espacio privado con una cookie de 30 días por defecto, renovable al abrir la web mientras siga vigente. Al caducar o borrar la cookie se abre un espacio nuevo; el historial anterior no se recupera desde la interfaz ni se sincroniza entre dispositivos. Descargar el PDF permite conservar una copia del informe.
 
 ### Desarrollo de interfaz
 
@@ -70,7 +72,7 @@ La versión inicial crea las tablas ausentes al iniciar; no incluye migraciones 
 
 ## Objetivo del producto
 
-La entrega prevista es una web publicada donde el astronauta muestra la pantalla de un instrumento médico a la cámara. La versión 0.3 interpreta etiquetas, valores y unidades, y prepara una lectura para confirmación; la identificación de modelos exactos sigue pendiente. La lectura confirmada se incorpora al historial y al informe.
+La entrega prevista es una web publicada donde el astronauta muestra la pantalla de un instrumento médico a la cámara. La versión 0.4 interpreta etiquetas, valores y unidades, y prepara una lectura para confirmación; la identificación de modelos exactos sigue pendiente. La observación estable se guarda automáticamente sin revisar; la revisión posterior permite incorporarla a las mediciones confirmadas y al informe.
 
 En el despliegue final, el usuario abrirá un enlace sin instalar Python ni iniciar servicios locales.
 
@@ -81,6 +83,7 @@ En el despliegue final, el usuario abrirá un enlace sin instalar Python ni inic
 - [Requisitos y límites del MVP](docs/REQUISITOS.md)
 - [Fuentes y función de los cinco recursos](docs/FUENTES.md)
 - [Modelo de datos inicial](docs/MODELO_DATOS.md)
+- [Flujo de cámara en vivo y registro automático](docs/LECTURA_EN_VIVO.md)
 - [Funcionamiento y límites del asistente](docs/ASISTENTE.md)
 - [Estado real, comprobaciones y pendientes](docs/ESTADO.md)
 - [Preparación del despliegue](docs/DESPLIEGUE.md)

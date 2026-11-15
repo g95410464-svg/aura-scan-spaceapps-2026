@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Activity, ArrowRight, ArrowUpRight, Check, ClipboardList, HeartPulse, History, Info, LoaderCircle, MessageCircle, Orbit, Plus, Send, ShieldCheck, X } from 'lucide-react';
 import { request } from '../../services/api';
-import type { AssistantSnapshot, HealthContext, Source } from '../../services/api';
+import { LiveReadings } from '../capture/LiveMonitor';
+import type { AssistantSnapshot, HealthContext, Source, LiveReading } from '../../services/api';
 
 const formatDate = (value: string) => new Date(value).toLocaleString('es-GT', { dateStyle:'medium', timeStyle:'short' });
 const environments: Record<string,string> = { unknown:'Sin especificar', station:'Estación espacial', spacecraft:'Nave espacial', moon:'Superficie lunar', mars:'Superficie de Marte', earth:'Tierra / simulación' };
@@ -14,7 +15,7 @@ function Sources({ ids, sources }: { ids: string[]; sources: Source[] }) {
   return <div className="evidence-sources">{ids.map(id => { const source=sources.find(s=>s.id===id); return source ? <a key={id} href={source.url} target="_blank" rel="noreferrer">{source.organization} · {source.title}<ArrowUpRight size={11}/></a> : null; })}</div>;
 }
 
-export function Assistant({ initialSubject, initialDemo, onCapture }: { initialSubject: string; initialDemo: boolean; onCapture: () => void }) {
+export function Assistant({ initialSubject, initialDemo, onCapture, onReview }: { initialSubject: string; initialDemo: boolean; onCapture: () => void; onReview:(item:LiveReading)=>void }) {
   const [subjects,setSubjects] = useState<{ subject_alias:string; is_demo:boolean }[]>([]);
   const [alias,setAlias] = useState(initialSubject);
   const [draftAlias,setDraftAlias] = useState(initialSubject || 'ASTRO-01');
@@ -74,6 +75,7 @@ export function Assistant({ initialSubject, initialDemo, onCapture }: { initialS
           <div className="assistant-observations"><h3><ShieldCheck size={16}/> Lo que está documentado</h3>{snapshot.observations.length ? <ul>{snapshot.observations.map(o=><li key={o}>{o}</li>)}</ul> : <p>Aún no hay lecturas confirmadas. Puedes empezar con una captura o añadir contexto.</p>}</div>
           <p className="assistant-boundary">No hay un diagnóstico establecido. La cantidad de datos no equivale a certeza clínica.</p>
         </section>
+        {snapshot.automatic_readings?.length>0&&<section className="assistant-evidence"><div className="section-heading"><h2><Activity size={18}/> Lecturas en vivo guardadas</h2><span className="eyebrow">SIN REVISIÓN</span></div><p className="input-hint">Registradas automáticamente. Se muestran separadas de las mediciones confirmadas.</p><LiveReadings items={snapshot.automatic_readings} onReview={onReview}/></section>}
         <section className="assistant-evidence"><div className="section-heading"><h2><Activity size={18}/> Lecturas reunidas</h2><button className="text-button" onClick={onCapture}>Añadir captura <Plus size={14}/></button></div>
           {snapshot.metrics.length ? <><div className="assistant-metrics">{snapshot.metrics.map(m=><article className="assistant-metric" key={m.code}><span>{m.label}</span><strong>{m.value}<small>{m.unit}</small></strong><div className="metric-comparison">{m.delta===null?'Sin comparación disponible':`${m.delta>0?'+':''}${m.delta} ${m.unit} entre confirmaciones`}</div><small>Medición: {m.measured_at?formatDate(m.measured_at):'hora no documentada'}</small><small>Confirmado: {formatDate(m.confirmed_at)}</small><div className="metric-series" aria-label={`Últimas ${m.series.length} confirmaciones de ${m.label}`}>{m.series.map((p,i)=><span key={i} title={formatDate(p.confirmed_at)}>{p.value}{i<m.series.length-1 && <ArrowRight size={10}/>}</span>)}</div><a href={`/api/measurements/${m.record_id}/report.pdf`}>Ver informe de origen <ArrowUpRight size={12}/></a></article>)}</div><p className="input-hint">Se muestra la última confirmación por indicador. Las comparaciones usan igual categoría y unidad, hasta 500 registros; pueden corresponder a momentos o condiciones diferentes.</p></> : <div className="inline-empty"><ClipboardList size={24}/><p>Las pantallas capturadas aparecerán aquí después de que revises y confirmes sus datos.</p></div>}
         </section>
