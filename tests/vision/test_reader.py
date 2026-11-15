@@ -61,3 +61,11 @@ def test_oximeter_combined_field_keeps_percentage():
     assert result['device_type']=='oximeter'
     assert result['fields'][0]['value']==98
     assert result['fields'][0]['unit']=='%'
+
+
+def test_smartwatch_is_declared_not_inferred_from_appearance():
+    result=parse_tokens([token('HR 72 bpm',200)],'smartwatch')
+    assert result['device_type']=='smartwatch'
+    assert result['fields'][0]['value']==72
+    assert result['device_model'] is None
+    assert any('no verifica' in warning for warning in result['warnings'])

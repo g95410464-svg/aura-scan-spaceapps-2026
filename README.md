@@ -2,7 +2,9 @@
 
 Primera versión ejecutable de una web de captura visual de instrumentos médicos para el reto de salud espacial de NASA Space Apps 2026. Nombre de trabajo; sin afiliación ni aprobación de NASA.
 
-**Estado 0.2:** interfaz React/TypeScript, API FastAPI, OCR real en Python, confirmación de lecturas, historial privado e informes PDF. El despliegue público de la aplicación todavía no se ha realizado. El repositorio sí es público.
+**Estado 0.3:** interfaz React/TypeScript, API FastAPI, OCR real en Python, confirmación de lecturas, historial privado e informes PDF. Aplicación publicada en Railway; repositorio público.
+
+Web: https://aura-scan-spaceapps-2026-production.up.railway.app/
 
 Repositorio: https://github.com/g95410464-svg/aura-scan-spaceapps-2026
 
@@ -11,11 +13,13 @@ Repositorio: https://github.com/g95410464-svg/aura-scan-spaceapps-2026
 - Acceso directo a captura al abrir la web, sin registro, contraseña ni inicio de sesión. Un espacio anónimo por navegador se prepara automáticamente con cookie HttpOnly.
 - Captura desde cámara o carga de PNG/JPEG/WebP, hasta 8 MB y 12 megapíxeles.
 - OCR con RapidOCR/ONNX y OpenCV, seguido de asociación por etiquetas y unidades visibles.
-- Campos de tensiómetro, pulsioxímetro, termómetro y glucómetro; son categorías experimentales, no modelos físicos certificados.
+- Campos de tensiómetro, pulsioxímetro, termómetro, glucómetro y reloj inteligente declarado manualmente; son categorías experimentales, no modelos físicos certificados.
 - Revisión y corrección antes de confirmar. Se conservan candidatos originales y auditoría.
 - Historial aislado por espacio de navegador, contexto declarado y tiempos de captura, medición y confirmación separados.
 - Informe PDF y comparación numérica con el registro anterior comparable.
-- Cinco recursos NASA/CSA integrados como fichas de contexto y referencias en informes.
+- Asistente de recomendaciones que reúne lecturas confirmadas por alias, contexto de misión, descanso, ánimo y antecedentes declarados.
+- Recomendaciones por reglas con razones y referencias NASA/CSA; FDA y MedlinePlus complementan calidad de medición y señales de alarma declaradas.
+- Cronología, diferencias numéricas entre confirmaciones comparables y datos faltantes; no hay diagnóstico automático.
 - Demostración con pantalla sintética procesada por el mismo OCR, identificada como ficticia.
 
 **Límite de la versión:** no hay clasificador entrenado de modelos exactos, conjunto Datumo/Smart Scan integrado, diagnóstico médico ni tratamiento validado. La prueba sintética no demuestra precisión sobre instrumentos reales ni de la ISS. El sistema no completa una unidad ausente por suposición; pide revisión.
@@ -36,11 +40,11 @@ cd ..
 
 En Linux/macOS, sustituir `.\.venv\Scripts\python.exe` por `.venv/bin/python`.
 
-Abrir http://127.0.0.1:8000, pulsar **Usar demostración**. El usuario de una futura web publicada solo abrirá el enlace; estos comandos son para desarrollo.
+Abrir http://127.0.0.1:8000, pulsar **Usar demostración**. El visitante de la web publicada solo abre el enlace; estos comandos son para desarrollo.
 
 ### Acceso directo e historial
 
-La primera pantalla es la captura. No hay cuentas, registro, contraseña ni botón de entrada. El navegador recibe automáticamente un espacio privado con una cookie de 8 horas por defecto. Al caducar o borrar la cookie se abre un espacio nuevo; el historial anterior no se recupera desde la interfaz ni se sincroniza entre dispositivos. Descargar el PDF permite conservar una copia del informe.
+La primera pantalla es la captura. No hay cuentas, registro, contraseña ni botón de entrada. El navegador recibe automáticamente un espacio privado con una cookie de 30 días por defecto, renovable al abrir la web mientras siga vigente. Al caducar o borrar la cookie se abre un espacio nuevo; el historial anterior no se recupera desde la interfaz ni se sincroniza entre dispositivos. Descargar el PDF permite conservar una copia del informe.
 
 ### Desarrollo de interfaz
 
@@ -66,7 +70,7 @@ La versión inicial crea las tablas ausentes al iniciar; no incluye migraciones 
 
 ## Objetivo del producto
 
-La entrega prevista es una web publicada donde el astronauta muestra la pantalla de un instrumento médico a la cámara. La versión 0.2 interpreta etiquetas, valores y unidades, y prepara una lectura para confirmación; la identificación de modelos exactos sigue pendiente. La lectura confirmada se incorpora al historial y al informe.
+La entrega prevista es una web publicada donde el astronauta muestra la pantalla de un instrumento médico a la cámara. La versión 0.3 interpreta etiquetas, valores y unidades, y prepara una lectura para confirmación; la identificación de modelos exactos sigue pendiente. La lectura confirmada se incorpora al historial y al informe.
 
 En el despliegue final, el usuario abrirá un enlace sin instalar Python ni iniciar servicios locales.
 
@@ -77,6 +81,7 @@ En el despliegue final, el usuario abrirá un enlace sin instalar Python ni inic
 - [Requisitos y límites del MVP](docs/REQUISITOS.md)
 - [Fuentes y función de los cinco recursos](docs/FUENTES.md)
 - [Modelo de datos inicial](docs/MODELO_DATOS.md)
+- [Funcionamiento y límites del asistente](docs/ASISTENTE.md)
 - [Estado real, comprobaciones y pendientes](docs/ESTADO.md)
 - [Preparación del despliegue](docs/DESPLIEGUE.md)
 - [Plan de arquitectura en PDF](output/pdf/AURA_Scan_Plan_de_Arquitectura.pdf) (documento de planificación previo a esta implementación).

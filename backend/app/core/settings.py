@@ -18,10 +18,12 @@ class Settings:
     frontend_dir: Path = ROOT / 'frontend/dist'
     secure_cookies: bool = field(default_factory=lambda: os.getenv('SECURE_COOKIES', 'true' if os.getenv('RAILWAY_PUBLIC_DOMAIN') else 'false').lower() == 'true')
     public_origin: str = field(default_factory=public_origin)
-    session_hours: int = 8
+    session_hours: int = field(default_factory=lambda: int(os.getenv('AURA_SESSION_HOURS', '720')))
     max_upload_bytes: int = 8 * 1024 * 1024
 
     def prepare(self):
+        if not 1 <= self.session_hours <= 2160:
+            raise ValueError('AURA_SESSION_HOURS debe estar entre 1 y 2160.')
         self.storage_dir.mkdir(parents=True, exist_ok=True)
         if self.database_url.startswith('sqlite:///'):
             Path(self.database_url.removeprefix('sqlite:///')).parent.mkdir(parents=True, exist_ok=True)

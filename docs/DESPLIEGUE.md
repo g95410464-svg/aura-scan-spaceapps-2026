@@ -1,6 +1,6 @@
 # Preparar la publicación
 
-La aplicación todavía no tiene un enlace público de producción. El contenedor propuesto sirve los archivos compilados de React y la API Python bajo el mismo origen.
+La aplicación está publicada en https://aura-scan-spaceapps-2026-production.up.railway.app/. El contenedor propuesto sirve los archivos compilados de React y la API Python bajo el mismo origen.
 
 ## Host requerido
 
@@ -16,7 +16,8 @@ La aplicación todavía no tiene un enlace público de producción. El contenedo
 |---|---|
 | `DATABASE_URL` | SQLite persistente o PostgreSQL con psycopg. |
 | `STORAGE_DIR` | Directorio privado de capturas; `/data/captures` en el contenedor. |
-| `PUBLIC_ORIGIN` | Origen exacto autorizado: esquema, dominio y puerto si corresponde. |
+| `PUBLIC_ORIGIN` | Origen exacto autorizado; si falta se usa HTTPS y `RAILWAY_PUBLIC_DOMAIN`. No se aceptan dominios por sufijo ni cabeceras forwarded arbitrarias. |
+| `AURA_SESSION_HOURS` | Duración de la cookie anónima; 720 horas por defecto, renovable al abrir la web. |
 | `SECURE_COOKIES` | `true` para HTTPS; `false` solo para desarrollo HTTP local. |
 | `PORT` | Puerto que asigna el proveedor; 8000 por defecto. |
 
@@ -39,3 +40,7 @@ No se ha contratado un proveedor ni se anuncian costos o capacidad sin comprobar
 El primer arranque crea las tablas ausentes. No modifica automáticamente tablas existentes. Antes de publicar nuevas versiones con cambios de esquema, añadir migraciones y respaldos; no borrar el volumen para resolver una actualización.
 
 La versión 0.2 crea las tablas `workspaces`, `browser_sessions`, `workspace_captures`, `workspace_measurements` y `workspace_audit_events`. Si existe una base de la versión 0.1, sus tablas y archivos se conservan, pero no se enlazan a los espacios anónimos ni se exponen por la API nueva. La cookie antigua se descarta. No hay recuperación de cuentas ni migración automática de su historial; respaldar antes de actualizar.
+
+## Configuración Railway actual
+
+Servicio `aura-scan-spaceapps-2026` del proyecto `cora-travel`, conectado a `main`. Volumen `aura-health-history` de 500 MB en `/aura-data`. `DATABASE_URL=sqlite:////aura-data/aura.sqlite3`, `STORAGE_DIR=/aura-data/captures`, origen HTTPS explícito y cookies Secure. Railway monta volúmenes como root; `RAILWAY_RUN_UID=0` permite escribir en el volumen con la imagen actual. La ejecución sin root y el ajuste de permisos del volumen son pendientes de endurecimiento. Los datos efímeros de versiones anteriores no se migran automáticamente.

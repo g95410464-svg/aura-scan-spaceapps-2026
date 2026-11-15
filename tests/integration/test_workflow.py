@@ -97,6 +97,21 @@ def test_anonymous_cookie_and_workspace_are_reused(visitor_client,application):
         assert 'auth_sessions' not in inspect(db.bind).get_table_names()
 
 
+def test_active_browser_renews_without_losing_workspace(visitor_client,capture,application):
+    visitor_client.post(f'/api/captures/{capture["id"]}/confirm',json=confirmation())
+    cookie=visitor_client.cookies['aura_browser']
+    with application.state.db_session() as db:
+        browser=db.scalar(select(BrowserSession))
+        browser.expires_at=int(datetime.now(timezone.utc).timestamp())+60
+        db.commit()
+    assert visitor_client.get('/api/session').status_code==200
+    assert visitor_client.cookies['aura_browser']==cookie
+    assert len(visitor_client.get('/api/measurements').json()['items'])==1
+    with application.state.db_session() as db:
+        assert len(db.scalars(select(Workspace)).all())==1
+        assert db.scalar(select(BrowserSession)).expires_at>int(datetime.now(timezone.utc).timestamp())+86400
+
+
 def test_no_accounts_or_login_endpoints(client):
     response=client.get('/api/session')
     assert response.status_code==200

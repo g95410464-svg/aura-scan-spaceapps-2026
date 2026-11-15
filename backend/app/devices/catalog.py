@@ -12,6 +12,7 @@ DEVICES = {
     'oximeter': {'label': 'Pulsioxímetro', 'fields': ['spo2', 'pulse'], 'required': ['spo2']},
     'thermometer': {'label': 'Termómetro', 'fields': ['temperature'], 'required': ['temperature']},
     'glucometer': {'label': 'Glucómetro', 'fields': ['glucose'], 'required': ['glucose']},
+    'smartwatch': {'label': 'Reloj inteligente (experimental)', 'fields': ['pulse', 'spo2'], 'required': ['pulse']},
 }
 
 

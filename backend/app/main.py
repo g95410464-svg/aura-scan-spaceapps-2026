@@ -1,7 +1,8 @@
 import secrets
 import time
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request, Response, Depends, HTTPException, UploadFile, File, Form
+from fastapi import FastAPI, Request, Response, Depends, HTTPException, UploadFile, File, Form, Query
+from typing import Literal
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import create_engine, select, delete, event
@@ -9,12 +10,14 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import IntegrityError
 from backend.app.core.settings import Settings
 from backend.app.core.security import get_workspace, get_db, limit_attempts, digest, origin_key
-from backend.app.storage.models import Base, Workspace, BrowserSession, Capture, Measurement, AuditEvent
+from backend.app.storage.models import Base, Workspace, BrowserSession, Capture, Measurement, AuditEvent, HealthContext
 from backend.app.measurements.schemas import Confirmation
 from backend.app.devices.catalog import catalog, DEVICES
 from backend.app.vision.reader import sanitize_image, analyze_image, ImageRejected
 from backend.app.vision.demo import demo_image
 from backend.app.assessments.evaluate import evaluate
+from backend.app.assessments.assistant import build_assistant
+from backend.app.assessments.schemas import ContextInput
 from backend.app.knowledge.sources import SOURCES
 from backend.app.reports.pdf import render_report
 
@@ -32,7 +35,7 @@ def create_app(settings: Settings | None = None):
         Base.metadata.create_all(engine)
         yield
         engine.dispose()
-    app=FastAPI(title='AURA Scan',version='0.2.0',lifespan=lifespan,docs_url=None,redoc_url=None,
+    app=FastAPI(title='AURA Scan',version='0.3.0',lifespan=lifespan,docs_url=None,redoc_url=None,
                 description='Captura visual experimental de instrumentos. Sin diagnóstico clínico validado.')
     app.state.db_session=sessionmaker(engine,expire_on_commit=False)
     app.state.settings=config
@@ -65,7 +68,7 @@ def create_app(settings: Settings | None = None):
 
     @app.get('/api/health')
     def health():
-        return {'status':'ok','version':'0.2.0','clinical_validation':False,'dataset_integrated':False}
+        return {'status':'ok','version':'0.3.0','clinical_validation':False,'dataset_integrated':False}
 
     @app.get('/api/session')
     def browser_session(request: Request,response: Response,db=Depends(get_db)):
@@ -73,6 +76,12 @@ def create_app(settings: Settings | None = None):
         token=request.cookies.get('aura_browser','')
         current=db.get(BrowserSession,digest(token)) if token else None
         if current is not None and current.expires_at>int(time.time()):
+            # Renew active browser spaces without creating accounts or moving evidence.
+            lifetime=config.session_hours*3600
+            if current.expires_at-int(time.time())<lifetime//2:
+                current.expires_at=int(time.time())+lifetime
+                db.commit()
+                response.set_cookie('aura_browser',token,httponly=True,secure=config.secure_cookies,samesite='lax',max_age=lifetime,path='/')
             return {'csrf':current.csrf,'expires_at':current.expires_at}
         limit_attempts(request,'browser_session',60,3600)
         token=secrets.token_urlsafe(32)
@@ -177,6 +186,31 @@ def create_app(settings: Settings | None = None):
     def history(workspace=Depends(get_workspace),db=Depends(get_db)):
         records=db.scalars(select(Measurement).where(Measurement.owner_id==workspace.id).order_by(Measurement.created_at.desc()).limit(100)).all()
         return {'items':[serialize(r) for r in records]}
+
+    @app.get('/api/assistant/subjects')
+    def subjects(workspace=Depends(get_workspace),db=Depends(get_db)):
+        rows = db.execute(select(Measurement.subject_alias, Measurement.is_demo).where(Measurement.owner_id==workspace.id).distinct()).all()
+        rows += db.execute(select(HealthContext.subject_alias, HealthContext.is_demo).where(HealthContext.owner_id==workspace.id).distinct()).all()
+        return {'items':[{'subject_alias':alias,'is_demo':demo} for alias,demo in sorted(set(rows))]}
+
+    @app.get('/api/assistant')
+    def assistant(subject_alias: str=Query(min_length=1,max_length=80),is_demo: bool=False,
+                  intent: Literal['overview','changes','next','mission','radiation']='overview',
+                  workspace=Depends(get_workspace),db=Depends(get_db)):
+        alias=subject_alias.strip()
+        if not alias: raise HTTPException(422,'Introduce el alias del astronauta.')
+        records=db.scalars(select(Measurement).where(Measurement.owner_id==workspace.id,Measurement.subject_alias==alias,
+                           Measurement.is_demo==is_demo).order_by(Measurement.created_at.desc()).limit(500)).all()
+        contexts=db.scalars(select(HealthContext).where(HealthContext.owner_id==workspace.id,HealthContext.subject_alias==alias,
+                            HealthContext.is_demo==is_demo).order_by(HealthContext.created_at.desc()).limit(50)).all()
+        return build_assistant(records,contexts,alias,is_demo,intent)
+
+    @app.post('/api/assistant/context',status_code=201)
+    def save_context(data: ContextInput,request: Request,workspace=Depends(get_workspace),db=Depends(get_db)):
+        limit_attempts(request,'context',60,3600)
+        item=HealthContext(owner_id=workspace.id,**data.model_dump())
+        db.add(item);db.commit()
+        return {'id':item.id,'created_at':item.created_at}
 
     @app.get('/api/measurements/{record_id}/report.pdf')
     def report(record_id: str,workspace=Depends(get_workspace),db=Depends(get_db)):

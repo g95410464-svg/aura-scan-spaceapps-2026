@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import String, Text, ForeignKey, JSON, Integer
+from sqlalchemy import String, Text, ForeignKey, JSON, Integer, Float
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -64,3 +64,18 @@ class AuditEvent(Base):
     created_at: Mapped[str] = mapped_column(String(40), default=now_iso)
     action: Mapped[str] = mapped_column(String(40))
     detail: Mapped[dict] = mapped_column(JSON)
+
+
+class HealthContext(Base):
+    __tablename__ = 'workspace_health_contexts'
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    owner_id: Mapped[str] = mapped_column(ForeignKey('workspaces.id'), index=True)
+    subject_alias: Mapped[str] = mapped_column(String(80), index=True)
+    is_demo: Mapped[bool] = mapped_column(default=False)
+    created_at: Mapped[str] = mapped_column(String(40), default=now_iso)
+    environment: Mapped[str] = mapped_column(String(30))
+    sleep_hours: Mapped[float | None] = mapped_column(Float, nullable=True)
+    mood: Mapped[str] = mapped_column(String(30))
+    symptoms: Mapped[str] = mapped_column(Text, default='')
+    medical_notes: Mapped[str] = mapped_column(Text, default='')
+    red_flags: Mapped[list] = mapped_column(JSON, default=list)

@@ -42,7 +42,7 @@ def _norm(s):
 def parse_tokens(tokens: list[dict], selected_type: str = 'auto') -> dict:
     """Associate only explicit labels and units, never just digit order or appearance."""
     aliases = {'systolic': {'SYS', 'SYSTOLIC'}, 'diastolic': {'DIA', 'DIASTOLIC'},
-               'pulse': {'PUL', 'PULSE', 'PR', 'BPM', 'PRBPM'}, 'spo2': {'SPO2', 'SPO2%', '%SPO2'}}
+               'pulse': {'PUL', 'PULSE', 'PR', 'BPM', 'PRBPM', 'HR', 'HEARTRATE'}, 'spo2': {'SPO2', 'SPO2%', '%SPO2'}}
     fields = {}
     problems = []
     full = ' '.join(t['text'] for t in tokens)
@@ -100,7 +100,8 @@ def parse_tokens(tokens: list[dict], selected_type: str = 'auto') -> dict:
     inferred = ('blood_pressure' if {'systolic','diastolic'} & fields.keys() else
                 'oximeter' if 'spo2' in fields else 'thermometer' if 'temperature' in fields else
                 'glucometer' if 'glucose' in fields else 'unknown')
-    if selected_type != 'auto' and inferred not in {'unknown', selected_type}:
+    compatible_watch = selected_type == 'smartwatch' and set(fields).issubset({'pulse','spo2'})
+    if selected_type != 'auto' and inferred not in {'unknown', selected_type} and not compatible_watch:
         problems.append('La categoría seleccionada no coincide con las etiquetas detectadas. Revisa todos los campos.')
     device_type = inferred if selected_type == 'auto' else selected_type
     if re.search(r'\b(ERR(?:OR)?|E[- ]?\d|MEM(?:ORY)?|AVG)\b', full.upper()):
@@ -109,6 +110,8 @@ def parse_tokens(tokens: list[dict], selected_type: str = 'auto') -> dict:
         problems.append('Falta una unidad visible: debes seleccionarla explícitamente antes de confirmar.')
     if not fields:
         problems.append('No se pudieron asociar lecturas con etiquetas o unidades. Repite o completa la revisión manualmente.')
+    if selected_type == 'smartwatch':
+        problems.append('Reloj declarado manualmente: el OCR no verifica su modelo ni precisión clínica. Confirma que son valores actuales, no objetivos o promedios.')
     return {'device_type':device_type, 'device_model':None, 'recognition':'visible_labels' if fields else 'unresolved',
             'fields':list(fields.values()), 'warnings':problems, 'tokens':tokens,
             'clinical_confidence':None, 'engine':'RapidOCR / ONNX', 'version':'0.1.0'}

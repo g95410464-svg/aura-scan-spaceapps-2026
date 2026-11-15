@@ -1,6 +1,6 @@
 # Arquitectura propuesta
 
-Estado: arquitectura propuesta con una primera implementación parcial. Ver `ESTADO.md` para funciones comprobadas y límites de la versión 0.2.
+Estado: arquitectura propuesta con una primera implementación parcial. Ver `ESTADO.md` para funciones comprobadas y límites de la versión 0.3.
 
 ```text
 Navegador (cámara o imagen)
@@ -55,3 +55,5 @@ Los contratos y el procesamiento asíncrono se concretan durante la implementaci
 ## Disponibilidad
 
 La web publicada no exige instalación al usuario. El procesamiento Python remoto depende de red y del servidor; no se promete funcionamiento sin conexión en este alcance.
+
+La sección Asistente reúne la evidencia confirmada por alias, añade contexto y aplica reglas de seguimiento con fuentes. `workspace_health_contexts` conserva las declaraciones de forma acumulativa. No hay un motor de diagnóstico generativo; véase `ASISTENTE.md`.

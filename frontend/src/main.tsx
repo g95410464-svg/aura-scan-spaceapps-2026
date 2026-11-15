@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Activity, ArrowDownToLine, ArrowRight, ArrowUpRight, BookOpen, Camera, Check, CheckCircle2, ChevronRight, ClipboardList, FileText, History, Info, LoaderCircle, Orbit, Plus, RefreshCw, ScanLine, ShieldCheck, Upload, X } from 'lucide-react';
+import { Activity, ArrowDownToLine, ArrowRight, Camera, Check, CheckCircle2, ChevronRight, ClipboardList, FileText, History, Info, LoaderCircle, Orbit, Plus, MessageCircle, ScanLine, ShieldCheck, Upload, X } from 'lucide-react';
 import { request, ensureSession, resetSession } from './services/api';
-import type { Capture, Device, Measurement, Source } from './services/api';
+import type { Capture, Device, Measurement } from './services/api';
 import './styles.css';
+import { Assistant } from './features/assessments/Assistant';
 
-type Tab = 'capture' | 'history' | 'knowledge';
+type Tab = 'capture' | 'history' | 'assistant';
 const labels: Record<string, string> = { systolic: 'Presión sistólica', diastolic: 'Presión diastólica', pulse: 'Pulso', spo2: 'Saturación SpO₂', temperature: 'Temperatura', glucose: 'Glucosa' };
 const date = (value: string) => new Date(value).toLocaleString('es-GT', { dateStyle: 'medium', timeStyle: 'short' });
 const message = (e: unknown) => e instanceof Error ? e.message : 'No se pudo completar la operación.';
@@ -14,7 +15,7 @@ function Brand({ light = false }: { light?: boolean }) {
   return <div className={`brand ${light ? 'light' : ''}`}><span className="brand-icon"><Orbit size={29} strokeWidth={1.4} /></span><span>AURA<span className="brand-scan">SCAN</span></span></div>;
 }
 
-function Report({ record, onNew }: { record: Measurement; onNew?: () => void }) {
+function Report({ record, onNew, onAssistant }: { record: Measurement; onNew?: () => void; onAssistant?: () => void }) {
   return <section className="report-panel"><div className="panel-title"><div><span className="eyebrow">REGISTRO CONFIRMADO</span><h2>Una lectura, con contexto.</h2></div><CheckCircle2 className="success-icon" size={32} /></div>
     {record.is_demo && <div className="notice">Demostración con datos ficticios. No corresponde a una medición real.</div>}
     <div className="record-meta"><span><small>ASTRONAUTA / ALIAS</small><strong>{record.subject_alias}</strong></span><span><small>CONFIRMACIÓN</small><strong>{date(record.created_at)}</strong></span></div>
@@ -22,11 +23,11 @@ function Report({ record, onNew }: { record: Measurement; onNew?: () => void }) 
     <div className="report-section"><h3>Lo que sabemos de este registro</h3><ul>{record.assessment.findings.map((finding, i) => <li key={i}>{finding}</li>)}</ul></div>
     {record.assessment.trends.length > 0 && <div className="report-section"><h3>Diferencia frente al registro anterior</h3><div className="trend-row">{record.assessment.trends.map(t => <span key={t.code}>{labels[t.code]}: <b>{t.delta > 0 ? '+' : ''}{t.delta} {t.unit}</b></span>)}</div></div>}
     <div className="report-section"><h3>Siguientes comprobaciones</h3><ul>{record.assessment.next_steps.map((s, i) => <li key={i}>{s}</li>)}</ul></div>
-    <p className="fine-print">{record.assessment.limitation}</p><div className="actions"><a className="button primary" href={`/api/measurements/${record.id}/report.pdf`}><ArrowDownToLine size={17} /> Descargar informe PDF</a>{onNew && <button className="button secondary" onClick={onNew}><Plus size={17} /> Nueva captura</button>}</div>
+    <p className="fine-print">{record.assessment.limitation}</p><div className="actions"><a className="button primary" href={`/api/measurements/${record.id}/report.pdf`}><ArrowDownToLine size={17} /> Descargar informe PDF</a>{onAssistant && <button className="button secondary" onClick={onAssistant}><MessageCircle size={17} /> Ver seguimiento y recomendaciones</button>}{onNew && <button className="button secondary" onClick={onNew}><Plus size={17} /> Nueva captura</button>}</div>
   </section>;
 }
 
-function CapturePage({ devices, onSaved }: { devices: Device[]; onSaved: (m: Measurement) => void }) {
+function CapturePage({ devices, onSaved, onFollowUp }: { devices: Device[]; onSaved: (m: Measurement) => void; onFollowUp: (m: Measurement) => void }) {
   const [capture, setCapture] = useState<Capture | null>(null);
   const [record, setRecord] = useState<Measurement | null>(null);
   const [busy, setBusy] = useState(false);
@@ -89,7 +90,7 @@ function CapturePage({ devices, onSaved }: { devices: Device[]; onSaved: (m: Mea
   return <><div className="page-heading"><div><span className="eyebrow">EVALUACIÓN / CAPTURA VISUAL</span><h1>Una captura.<br className="mobile-only" /> Un registro trazable.</h1><p>La cámara lee la pantalla. Tú confirmas qué se incorpora al historial.</p></div><span className="tag"><ScanLine size={14} /> OCR experimental</span></div>
     <div className="phase-bar">{['Captura del instrumento', 'Revisión de lecturas', 'Informe y seguimiento'].map((s, i) => <div className={phase === i + 1 ? 'active' : phase > i + 1 ? 'complete' : ''} key={s}><span>{phase > i + 1 ? <Check size={14} /> : `0${i + 1}`}</span>{s}{i < 2 && <ChevronRight size={16} />}</div>)}</div>
     {error && <div className="notice error" role="alert"><Info size={17} />{error}</div>}
-    {record ? <Report record={record} onNew={reset} /> : <div className="capture-layout"><section className="capture-panel"><div className="panel-title compact"><div><h2>{capture ? 'Evidencia de la lectura' : 'Enfoca la pantalla'}</h2><p>{capture ? date(capture.created_at) : 'Buena luz, sin reflejos y con etiquetas visibles.'}</p></div><Camera size={20} /></div>
+    {record ? <Report record={record} onNew={reset} onAssistant={() => onFollowUp(record)} /> : <div className="capture-layout"><section className="capture-panel"><div className="panel-title compact"><div><h2>{capture ? 'Evidencia de la lectura' : 'Enfoca la pantalla'}</h2><p>{capture ? date(capture.created_at) : 'Buena luz, sin reflejos y con etiquetas visibles.'}</p></div><Camera size={20} /></div>
       <div className={`viewfinder ${capture ? 'has-image' : ''}`}>
         {live ? <video ref={video} autoPlay playsInline muted onLoadedMetadata={() => setCameraReady(true)} /> : capture ? <img src={capture.image_url} alt="Pantalla capturada del instrumento, para revisar los valores extraídos" /> : <><div className="scan-corners"><ScanLine size={62} strokeWidth={1} /><span>Coloca el instrumento<br />dentro del encuadre</span></div><div className="viewfinder-bottom"><span className="status-dot" /> CÁMARA EN ESPERA</div></>}
         {capture?.is_demo && <span className="demo-overlay">DATOS FICTICIOS</span>}{busy && <div className="processing" role="status"><LoaderCircle className="spin" size={34} /><strong>Procesando imagen</strong><span>Buscando dígitos, etiquetas y unidades…</span></div>}
@@ -121,7 +122,8 @@ function App() {
   const [bootError, setBootError] = useState('');
   const [tab, setTab] = useState<Tab>('capture');
   const [devices, setDevices] = useState<Device[]>([]);
-  const [sources, setSources] = useState<Source[]>([]);
+  const [assistantSubject, setAssistantSubject] = useState('');
+  const [assistantDemo, setAssistantDemo] = useState(false);
   const [records, setRecords] = useState<Measurement[]>([]);
   const [selectedRecord, setSelectedRecord] = useState<Measurement | null>(null);
   const [error, setError] = useState('');
@@ -135,18 +137,19 @@ function App() {
     setBootError('');
     void ensureSession().then(async () => {
       if (!active) return;
-      const [d, s, h] = await Promise.all([request<{ devices: Device[] }>('/devices'), request<{ sources: Source[] }>('/knowledge'), request<{ items: Measurement[] }>('/measurements')]);
-      if (active) { setDevices(d.devices); setSources(s.sources); setRecords(h.items); }
+      const [d, h] = await Promise.all([request<{ devices: Device[] }>('/devices'), request<{ items: Measurement[] }>('/measurements')]);
+      if (active) { setDevices(d.devices); setRecords(h.items); }
     }).catch(e => { if (active) setBootError(message(e)); }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [sessionGeneration]);
+  function followUp(record: Measurement) { setAssistantSubject(record.subject_alias); setAssistantDemo(record.is_demo); setTab('assistant'); }
   if (loading) return <div className="loading-screen"><Orbit size={40} className="slow-spin" /><span>Preparando el sistema…</span></div>;
   if (bootError) return <div className="loading-screen"><Info size={32} /><span>{bootError}</span><button className="button primary" onClick={() => { setLoading(true); setSessionGeneration(g => g + 1); }}>Reintentar</button></div>;
-  return <div className="app-shell"><aside className="sidebar"><Brand light /><div className="mission-label"><span className="status-dot" /> SALUD DE MISIÓN</div><nav aria-label="Navegación principal">{([{ id: 'capture', name: 'Nueva evaluación', icon: ScanLine }, { id: 'history', name: 'Historial', icon: History }, { id: 'knowledge', name: 'Conocimiento', icon: BookOpen }] as const).map(item => <button key={item.id} className={tab === item.id ? 'active' : ''} onClick={() => { setTab(item.id); setError(''); }}><item.icon size={19} />{item.name}{tab === item.id && <span className="nav-dot" />}</button>)}</nav><div className="sidebar-note"><Orbit size={30} strokeWidth={1} /><strong>La evidencia primero.</strong><p>Cada lectura conserva su procedencia y requiere tu confirmación.</p><span>SPACE APPS / 2026</span></div><div className="workspace-status"><ShieldCheck size={19} /><div><strong>Acceso directo</strong><small>Espacio de este navegador</small></div></div></aside>
-    <div className="main-shell"><header className="topbar"><div><span>Centro de salud</span><ChevronRight size={14} /><strong>{tab === 'capture' ? 'Evaluación' : tab === 'history' ? 'Historial' : 'Conocimiento'}</strong></div><span className="topbar-status"><span className="status-dot" /> Prototipo 0.2</span></header><main className="workspace">{error && <div className="notice error" role="alert">{error}<button aria-label="Cerrar aviso" onClick={() => setError('')}><X size={16} /></button></div>}
-      {tab === 'capture' && <CapturePage devices={devices} onSaved={record => setRecords(previous => [record, ...previous])} />}
-      {tab === 'history' && <><div className="page-heading"><div><span className="eyebrow">CONTINUIDAD / EVIDENCIA</span><h1>El contexto se construye<br />lectura a lectura.</h1><p>{records.length} registros confirmados en este navegador.</p></div><button className="button primary" onClick={() => setTab('capture')}><Plus size={17} /> Nueva evaluación</button></div>{records.length === 0 ? <div className="empty-state"><History size={40} strokeWidth={1} /><h2>Tu historial empieza con una lectura.</h2><p>Las capturas pendientes no se añaden al informe hasta que las confirmes.</p><button className="button secondary" onClick={() => setTab('capture')}>Ir a captura <ArrowRight size={16} /></button></div> : <><div className="history-list">{records.map(record => <button className={selectedRecord?.id === record.id ? 'history-row selected' : 'history-row'} onClick={() => setSelectedRecord(record)} key={record.id}><span className="history-icon"><FileText size={20} /></span><span><strong>{record.subject_alias}</strong><small>{devices.find(d => d.id === record.device_type)?.label ?? record.device_type}</small></span><span className="history-values">{record.readings.map(r => `${r.value} ${r.unit}`).join(' · ')}</span><span><small>{date(record.created_at)}</small>{record.is_demo && <b className="demo-tag">Ficticio</b>}</span><ChevronRight size={17} /></button>)}</div>{selectedRecord && <Report record={selectedRecord} />}</> }</>}
-      {tab === 'knowledge' && <><div className="page-heading"><div><span className="eyebrow">CIENCIA / PROCEDENCIA</span><h1>Conocimiento con<br />sus fuentes a la vista.</h1><p>Cinco recursos oficiales para comprender el contexto de la salud espacial.</p></div><BookOpen size={36} strokeWidth={1} /></div><div className="notice"><Info size={18} /><span>Estos recursos aportan contexto científico. La biblioteca de protocolos diagnósticos y terapéuticos está pendiente de revisión clínica.</span></div><div className="sources-grid">{sources.map((source, i) => <article className="source-card" key={source.id}><div className="source-number">0{i + 1}<span>{source.organization}</span></div><h2>{source.title}</h2><p>{source.summary}</p><div className="source-application"><small>EN ESTA PLATAFORMA</small><p>{source.application}</p></div><a href={source.url} target="_blank" rel="noreferrer">Consultar fuente oficial <ArrowUpRight size={16} /></a></article>)}</div><div className="dataset-note"><RefreshCw size={22} /><div><h3>Reconocimiento de dispositivos: siguiente etapa</h3><p>El OCR actual interpreta etiquetas visibles. Los conjuntos Datumo/TILDE y Smart Scan están identificados para evaluación; todavía no están integrados y no acreditan compatibilidad con modelos de la ISS.</p></div></div></>}
+  return <div className="app-shell"><aside className="sidebar"><Brand light /><div className="mission-label"><span className="status-dot" /> SALUD DE MISIÓN</div><nav aria-label="Navegación principal">{([{ id: 'capture', name: 'Nueva evaluación', icon: ScanLine }, { id: 'history', name: 'Historial', icon: History }, { id: 'assistant', name: 'Asistente de salud', icon: MessageCircle }] as const).map(item => <button key={item.id} className={tab === item.id ? 'active' : ''} onClick={() => { setTab(item.id); setError(''); }}><item.icon size={19} />{item.name}{tab === item.id && <span className="nav-dot" />}</button>)}</nav><div className="sidebar-note"><Orbit size={30} strokeWidth={1} /><strong>La evidencia primero.</strong><p>Cada lectura conserva su procedencia y requiere tu confirmación.</p><span>SPACE APPS / 2026</span></div><div className="workspace-status"><ShieldCheck size={19} /><div><strong>Acceso directo</strong><small>Espacio de este navegador</small></div></div></aside>
+    <div className="main-shell"><header className="topbar"><div><span>Centro de salud</span><ChevronRight size={14} /><strong>{tab === 'capture' ? 'Evaluación' : tab === 'history' ? 'Historial' : 'Asistente de salud'}</strong></div><span className="topbar-status"><span className="status-dot" /> Prototipo 0.3</span></header><main className="workspace">{error && <div className="notice error" role="alert">{error}<button aria-label="Cerrar aviso" onClick={() => setError('')}><X size={16} /></button></div>}
+      {tab === 'capture' && <CapturePage devices={devices} onSaved={record => setRecords(previous => [record, ...previous])} onFollowUp={followUp} />}
+      {tab === 'history' && <><div className="page-heading"><div><span className="eyebrow">CONTINUIDAD / EVIDENCIA</span><h1>El contexto se construye<br />lectura a lectura.</h1><p>{records.length} registros confirmados en este navegador.</p></div><button className="button primary" onClick={() => setTab('capture')}><Plus size={17} /> Nueva evaluación</button></div>{records.length === 0 ? <div className="empty-state"><History size={40} strokeWidth={1} /><h2>Tu historial empieza con una lectura.</h2><p>Las capturas pendientes no se añaden al informe hasta que las confirmes.</p><button className="button secondary" onClick={() => setTab('capture')}>Ir a captura <ArrowRight size={16} /></button></div> : <><div className="history-list">{records.map(record => <button className={selectedRecord?.id === record.id ? 'history-row selected' : 'history-row'} onClick={() => setSelectedRecord(record)} key={record.id}><span className="history-icon"><FileText size={20} /></span><span><strong>{record.subject_alias}</strong><small>{devices.find(d => d.id === record.device_type)?.label ?? record.device_type}</small></span><span className="history-values">{record.readings.map(r => `${r.value} ${r.unit}`).join(' · ')}</span><span><small>{date(record.created_at)}</small>{record.is_demo && <b className="demo-tag">Ficticio</b>}</span><ChevronRight size={17} /></button>)}</div>{selectedRecord && <Report record={selectedRecord} onAssistant={() => followUp(selectedRecord)} />}</> }</>}
+      {tab === 'assistant' && <Assistant initialSubject={assistantSubject} initialDemo={assistantDemo} onCapture={() => setTab('capture')} />}
       <footer className="workspace-footer"><span>AURA SCAN · CAPTURA, CONFIRMACIÓN Y SEGUIMIENTO</span><span>Uso experimental · Sin validación clínica</span></footer>
     </main></div></div>;
 }

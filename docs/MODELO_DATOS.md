@@ -1,6 +1,6 @@
 # Modelo de datos inicial
 
-Esquema conceptual propuesto. La versión 0.2 implementa espacios anónimos de navegador, sesiones automáticas, capturas, mediciones y auditoría con SQLAlchemy; los perfiles clínicos, protocolos y relaciones avanzadas siguen pendientes. Ver `ESTADO.md`.
+Esquema conceptual propuesto. La versión 0.3 implementa espacios anónimos de navegador, sesiones automáticas, capturas, mediciones, contexto/antecedentes declarados y auditoría con SQLAlchemy; los perfiles clínicos, protocolos y relaciones avanzadas siguen pendientes. Ver `ESTADO.md`.
 
 | Entidad | Campos principales |
 |---|---|
@@ -29,3 +29,5 @@ Esquema conceptual propuesto. La versión 0.2 implementa espacios anónimos de n
 - `pendiente`, `confirmada`, `rechazada` y `sustituida` describen el ciclo de una medición; solo las confirmadas pueden alimentar evaluaciones.
 - Registrar correcciones con autor y fecha; distinguir datos reales, ficticios y manuales.
 - El consentimiento, las restricciones de acceso y la política de retención se implementan antes de habilitar datos reales.
+
+La tabla `workspace_health_contexts` conserva por espacio, alias y tipo ficticio/real los eventos de contexto: entorno, horas de sueño, ánimo, síntomas, antecedentes/tratamientos declarados y señales de alarma seleccionadas. Cada guardado añade un evento; la declaración más reciente es el contexto activo.
