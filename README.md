@@ -85,6 +85,8 @@ En el despliegue final, el usuario abrirá un enlace sin instalar Python ni inic
 - [Fuentes y función de los cinco recursos](docs/FUENTES.md)
 - [Modelo de datos inicial](docs/MODELO_DATOS.md)
 - [Demostración guiada y manejo de reflejos](docs/DEMOSTRACION.md)
+- [PowerPoint en inglés: funcionamiento y demostración](output/presentation/AURA_Scan_English_Presentation.pptx)
+- [Guion en inglés y lista para ensayar](output/presentation/AURA_Scan_English_Speaker_Notes.md)
 - [Flujo de cámara en vivo y registro automático](docs/LECTURA_EN_VIVO.md)
 - [Funcionamiento y límites del asistente](docs/ASISTENTE.md)
 - [Estado real, comprobaciones y pendientes](docs/ESTADO.md)
