@@ -103,10 +103,12 @@ export function LiveMonitor({ devices, pending, onSaved, onReview, onFollowUp }:
     try {
       if(source==='camera'){
         if(!navigator.mediaDevices?.getUserMedia)throw new Error(t("La cámara necesita HTTPS y un navegador compatible."));
-        acquired=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:facingOverride??cameraFacing},width:{ideal:2560},height:{ideal:1440},frameRate:{ideal:15,max:30}},audio:false});
+        acquired=await navigator.mediaDevices.getUserMedia({video:{facingMode:mobileCamera?{exact:facingOverride??cameraFacing}:{ideal:'user'},width:{ideal:2560},height:{ideal:1440},frameRate:{ideal:15,max:30}},audio:false});
         if(run!==generation.current){acquired.getTracks().forEach(t=>t.stop());return;}
         media.current=acquired;
         const track=acquired.getVideoTracks()[0];
+        const actualFacing=track.getSettings().facingMode;
+        if(actualFacing==='user'||actualFacing==='environment')setCameraFacing(actualFacing);
         const capabilities=track.getCapabilities?.() as MediaTrackCapabilities & {focusMode?:string[];exposureMode?:string[];whiteBalanceMode?:string[]};
         const tuning:Record<string,string>={};
         for(const key of ['focusMode','exposureMode','whiteBalanceMode'] as const)if(capabilities?.[key]?.includes('continuous'))tuning[key]='continuous';
@@ -126,7 +128,7 @@ export function LiveMonitor({ devices, pending, onSaved, onReview, onFollowUp }:
       if(run!==generation.current)return;
       halt();
       const name=e instanceof Error?e.name:'';
-      setError(name==='NotAllowedError'?t("El navegador no permitió la cámara. Habilita el permiso para esta web y vuelve a iniciar."):name==='NotFoundError'?t("No se encontró una cámara disponible. Conecta una o abre la web desde tu teléfono."):name==='NotReadableError'?t("La cámara está ocupada o no pudo iniciarse. Cierra otras aplicaciones que la usen."):e instanceof Error?e.message:t("No se pudo abrir la cámara."));
+      setError(name==='OverconstrainedError'?t('La cámara seleccionada no está disponible. Elige la otra opción.'):name==='NotAllowedError'?t("El navegador no permitió la cámara. Habilita el permiso para esta web y vuelve a iniciar."):name==='NotFoundError'?t("No se encontró una cámara disponible. Conecta una o abre la web desde tu teléfono."):name==='NotReadableError'?t("La cámara está ocupada o no pudo iniciarse. Cierra otras aplicaciones que la usen."):e instanceof Error?e.message:t("No se pudo abrir la cámara."));
     }finally{if(run===generation.current)setStarting(false);}
   }
   const active=mode!=='idle';

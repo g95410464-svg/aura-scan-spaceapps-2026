@@ -490,5 +490,6 @@
   "Cámara": "Camera",
   "Frontal": "Front camera",
   "Trasera": "Rear camera",
-  "Webcam / frontal": "Webcam / front camera"
+  "Webcam / frontal": "Webcam / front camera",
+  "La cámara seleccionada no está disponible. Elige la otra opción.": "Selected camera unavailable. Choose the other option."
 }
