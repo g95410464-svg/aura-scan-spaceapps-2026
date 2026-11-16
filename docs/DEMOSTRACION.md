@@ -19,3 +19,7 @@ Una zona sobreexpuesta puede haber perdido la información del número. Se advie
 ## Presentación
 
 El PowerPoint en inglés se entrega en `output/presentation`. Las notas del presentador contienen un guion y las referencias. La presentación usa una fotografía de contexto NASA y capturas de datos ficticios del producto; no muestra que NASA haya probado o aprobado la aplicación.
+
+## Interfaz breve
+
+La vista principal prioriza cifras y acciones cortas. Las razones, fuentes, evidencia y cronología se abren bajo demanda. Se muestran tres acciones y el resto queda en «Más acciones». Las señales de alarma declaradas conservan la instrucción de emergencia visible y prioritaria. El PowerPoint breve mantiene la explicación completa en las notas.

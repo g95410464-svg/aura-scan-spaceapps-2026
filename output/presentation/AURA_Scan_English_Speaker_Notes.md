@@ -45,7 +45,7 @@ Our evidence supports the software workflow: live frame processing, automatic ob
 1. Open the deployed web app and click Simulación.
 2. Explain that the three screens and their measurement times are fictional.
 3. Click Siguiente: Historial and show the two blood pressure records.
-4. Click Siguiente: Asistente and select ¿Qué ha cambiado? to show +6 and +2 mmHg.
+4. Click Siguiente: Asistente and select Cambios to show +6 and +2 mmHg.
 5. Point out the source links and missing-data limitations.
 6. Continue to Informe and download the sample PDF.
 7. Return to the camera. If demonstrating a real instrument, fill the frame with its complete display, including labels and units. Adjust the angle to remove glare.
