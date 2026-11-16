@@ -1,3 +1,4 @@
+import { MetricIcon } from '../../components/MetricVisual';
 import { t, reportUrl } from '../../i18n';
 import { ArrowDownToLine, ArrowRight, CheckCircle2, LoaderCircle, Play, X } from 'lucide-react';
 import type { Measurement, Field } from '../../services/api';
@@ -11,7 +12,7 @@ export function SimulationCoach({ result, step, busy, onNext, onClose }: {result
 
 export function SimulationReadings({ result }: {result:SimulationResult}) {
   const labels:Record<string,string>={systolic:t("Sistólica"),diastolic:t("Diastólica"),pulse:t("Pulso"),spo2:'SpO₂'};
-  return <section className="simulation-stage"><div className="page-heading"><div><span className="eyebrow">{t("LECTURAS DE PRUEBA")}</span><h1>{t("Lecturas listas")}</h1></div></div><div className="simulation-screen-grid">{result.screens.map((s,i)=><article key={s.record_id}><div className="simulation-screen-title"><span>0{i+1}</span><h2>{t(s.title)}</h2><CheckCircle2 size={17}/></div><img src={s.image_url} alt={t("Pantalla ficticia de {0}",t(s.title))}/><dl>{s.readings.map(r=><div key={r.code}><dt>{labels[r.code]??r.code}</dt><dd>{r.value}<small>{t(r.unit??'')}</small></dd></div>)}</dl></article>)}</div><details className="compact-details simulation-disclosure"><summary>{t("Sobre esta simulación")}</summary><p>{t(result.notice)} {t("OCR real sobre pantallas sintéticas. Los registros son guionados; no hay revisión clínica.")}</p></details></section>;
+  return <section className="simulation-stage"><div className="page-heading"><div><span className="eyebrow">{t("LECTURAS DE PRUEBA")}</span><h1>{t("Lecturas listas")}</h1></div></div><div className="simulation-screen-grid">{result.screens.map((s,i)=><article key={s.record_id}><div className="simulation-screen-title"><span>0{i+1}</span><h2>{t(s.title)}</h2><CheckCircle2 size={17}/></div><dl>{s.readings.map(r=><div key={r.code}><dt><MetricIcon code={r.code}/>{labels[r.code]??r.code}</dt><dd>{r.value}<small>{t(r.unit??'')}</small></dd></div>)}</dl><details className="simulation-evidence compact-details"><summary>{t("Ver pantalla de origen")}</summary><img src={s.image_url} alt={t("Pantalla ficticia de {0}",t(s.title))}/></details></article>)}</div><details className="compact-details simulation-disclosure"><summary>{t("Sobre esta simulación")}</summary><p>{t(result.notice)} {t("OCR real sobre pantallas sintéticas. Los registros son guionados; no hay revisión clínica.")}</p></details></section>;
 }
 
 export function SimulationReport({ result, onAssistant }: {result:SimulationResult;onAssistant:()=>void}) {

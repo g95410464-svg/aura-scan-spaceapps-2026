@@ -14,6 +14,8 @@ export function LiveReadings({ items, onReview, onFollowUp }: { items:LiveReadin
 }
 
 export function LiveMonitor({ devices, pending, onSaved, onReview, onFollowUp }: { devices:Device[]; pending:LiveReading[]; onSaved:(r:LiveReading)=>void; onReview:(r:LiveReading)=>void; onFollowUp:(s:Subject)=>void }) {
+  const mobileCamera = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1) || (navigator.maxTouchPoints>0 && Math.min(screen.width,screen.height)<768);
+  const [cameraFacing,setCameraFacing] = useState<'user'|'environment'>(mobileCamera?'environment':'user');
   const [subject,setSubject] = useState('');
   const [category,setCategory] = useState('auto');
   const [declaredDemo,setDeclaredDemo] = useState(false);
@@ -92,8 +94,8 @@ export function LiveMonitor({ devices, pending, onSaved, onReview, onFollowUp }:
     if(polling.current||!session.current)return;
     polling.current=true;void tick(generation.current,source);
   }
-  async function start(source:'camera'|'demo') {
-    if(starting||mode!=='idle')return;
+  async function start(source:'camera'|'demo', facingOverride?:'user'|'environment') {
+    if(starting||(mode!=='idle'&&!facingOverride))return;
     if(!subject.trim()&&source!=='demo'){setError(t("Indica el alias del astronauta antes de abrir la cámara."));return;}
     halt();const run=generation.current;
     setStarting(true);setError('');setNotice('');setFrame(null);setSaved([]);
@@ -101,7 +103,7 @@ export function LiveMonitor({ devices, pending, onSaved, onReview, onFollowUp }:
     try {
       if(source==='camera'){
         if(!navigator.mediaDevices?.getUserMedia)throw new Error(t("La cámara necesita HTTPS y un navegador compatible."));
-        acquired=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:2560},height:{ideal:1440},frameRate:{ideal:15,max:30}},audio:false});
+        acquired=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:facingOverride??cameraFacing},width:{ideal:2560},height:{ideal:1440},frameRate:{ideal:15,max:30}},audio:false});
         if(run!==generation.current){acquired.getTracks().forEach(t=>t.stop());return;}
         media.current=acquired;
         const track=acquired.getVideoTracks()[0];
@@ -134,6 +136,7 @@ export function LiveMonitor({ devices, pending, onSaved, onReview, onFollowUp }:
     {error&&<div role="alert" className="notice error"><Info size={17}/>{t(error)}</div>}
     {notice&&<div className="notice small"><Info size={16}/>{t(notice)}</div>}
     <div className="live-layout"><section className="capture-panel live-camera-panel"><div className="panel-title compact"><div><h2>{mode==='demo'?t("Señal de prueba simulada"):active?t("Cámara en vivo"):t("Pantalla del instrumento")}</h2><p>{active?t("Lectura automática · Sin audio"):t("Incluye números, etiquetas y unidades.")}</p></div><span className={`live-indicator ${active?'active':''}`}><span/>{active?t("EN VIVO"):t("EN ESPERA")}</span></div>
+      <label className="camera-selector"><span><Camera size={15}/>{t('Cámara')}</span><select aria-label={t('Cámara')} value={cameraFacing} disabled={starting||mode==='demo'} onChange={event=>{const facing=event.target.value as 'user'|'environment';setCameraFacing(facing);if(mode==='camera')void start('camera',facing);}}><option value="user">{t(mobileCamera?'Frontal':'Webcam / frontal')}</option>{mobileCamera&&<option value="environment">{t('Trasera')}</option>}</select></label>
       <div className="capture-controls">{active?<button className="button primary" onClick={()=>halt(t("Lectura detenida. Las observaciones guardadas siguen en el historial."))}><Pause size={17}/> {t("Detener lectura")}</button>:starting?<button className="button secondary" onClick={()=>halt(t("Inicio cancelado."))}><LoaderCircle className="spin" size={17}/> {t("Cancelar inicio")}</button>:<button className="button primary" onClick={()=>void start('camera')}><Camera size={17}/> {t("Iniciar cámara")}</button>}</div>
       <div className="viewfinder live-viewfinder" style={mode==='camera'&&resolution.width?{aspectRatio:`${resolution.width}/${resolution.height}`}:undefined}>{mode==='camera'?<><video ref={video} autoPlay playsInline muted onLoadedMetadata={()=>setResolution({width:video.current?.videoWidth??0,height:video.current?.videoHeight??0})} onLoadedData={()=>beginPolling('camera')}/><div className="reading-roi" style={{inset:`${(1-1/zoom)*50}%`}} aria-hidden="true"/></>:mode==='demo'?<img src="/api/live/demo-screen" alt={t("Pantalla sintética repetida para demostrar la lectura automática; no es una cámara real")}/>:<div className="scan-corners"><ScanLine size={58} strokeWidth={1}/><span>{t("Reloj, oxímetro, tensiómetro")}<br/>{t("o instrumento compatible")}</span></div>}{active&&<span className="live-overlay"><span className={analyzing?'status-dot pulse-dot':'status-dot'}/>{mode==='demo'?t("DATOS FICTICIOS / SEÑAL SIMULADA"):analyzing?t("ANALIZANDO PANTALLA"):t("ESPERANDO SIGUIENTE LECTURA")}</span>}</div>
       <div className="camera-quality-controls"><label>{t("Área de lectura")} <strong>{zoom.toFixed(1)}×</strong><input type="range" aria-label={t("Acercar área de lectura")} min="1" max="3" step="0.1" value={zoom} disabled={mode==='demo'} onChange={e=>{const value=Number(e.target.value);setZoom(value);zoomRef.current=value;}}/></label><p>{resolution.width&&mode==='camera'?t("{0} × {1} px recibidos. ",resolution.width,resolution.height):''}{t("Centra la pantalla. ¿Reflejo? Cambia el ángulo.")}</p></div>

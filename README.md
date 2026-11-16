@@ -45,6 +45,10 @@ En Linux/macOS, sustituir `.\.venv\Scripts\python.exe` por `.venv/bin/python`.
 
 Abrir http://127.0.0.1:8000, abrir **Probar el flujo continuo sin usar una cámara** y pulsar **Iniciar señal simulada**. El visitante de la web publicada solo abre el enlace; estos comandos son para desarrollo.
 
+### Cámara y apariencia
+
+La interfaz usa negro y azul por defecto, con cifras claras, iconos y gráficas de registros guardados. En celular se puede elegir cámara frontal o trasera; en computadora se solicita la cámara frontal o webcam. Cambiar de cámara en vivo detiene la anterior antes de solicitar la nueva. El navegador y el equipo determinan qué cámaras están disponibles. Las pantallas originales de la simulación se abren en «View source display».
+
 ### Idiomas
 
 La web abre en inglés por defecto. El selector **English / Español** cambia la interfaz sin recargar la página y recuerda la preferencia en este navegador. Los PDF se descargan en el idioma seleccionado. Alias, notas escritas y datos de medición se conservan sin traducción ni conversión; `lpm` se muestra como `bpm` en inglés. El catálogo de traducciones se comparte en `shared/i18n`.

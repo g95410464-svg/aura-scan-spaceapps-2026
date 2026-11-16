@@ -5,6 +5,7 @@ import { Activity, ArrowDownToLine, ArrowRight, Camera, Radio, Play, Check, Chec
 import { request, ensureSession, resetSession } from './services/api';
 import type { Capture, Device, Measurement, LiveReading } from './services/api';
 import './styles.css';
+import './mission-theme.css';
 import { Assistant } from './features/assessments/Assistant';
 import { LiveMonitor, LiveReadings } from './features/capture/LiveMonitor';
 import { SimulationCoach, SimulationReadings, SimulationReport } from './features/capture/Simulation';

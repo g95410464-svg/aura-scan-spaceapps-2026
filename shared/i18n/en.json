@@ -485,5 +485,10 @@
   "Espera antes del siguiente fotograma.": "Wait before sending the next frame.",
   "Esta captura ya fue confirmada.": "This capture was already confirmed.",
   "Informe no encontrado.": "Report not found.",
-  "Ruta de API no encontrada.": "API route not found."
+  "Ruta de API no encontrada.": "API route not found.",
+  "Ver pantalla de origen": "View source display",
+  "Cámara": "Camera",
+  "Frontal": "Front camera",
+  "Trasera": "Rear camera",
+  "Webcam / frontal": "Webcam / front camera"
 }
