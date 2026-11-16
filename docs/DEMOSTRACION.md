@@ -23,3 +23,7 @@ El PowerPoint en inglés se entrega en `output/presentation`. Las notas del pres
 ## Interfaz breve
 
 La vista principal prioriza cifras y acciones cortas. Las razones, fuentes, evidencia y cronología se abren bajo demanda. Se muestran tres acciones y el resto queda en «Más acciones». Las señales de alarma declaradas conservan la instrucción de emergencia visible y prioritaria. El PowerPoint breve mantiene la explicación completa en las notas.
+
+## Idioma para presentar
+
+La web abre en inglés y recuerda la elección del selector English / Español. El recorrido en inglés es Simulation → Next: History → Next: Assistant → Next: Report. Las fuentes y mensajes se traducen al mostrarlos; el contenido original de las notas y las mediciones no cambia. El PDF usa el idioma activo.

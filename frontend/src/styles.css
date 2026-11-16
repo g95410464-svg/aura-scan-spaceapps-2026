@@ -61,3 +61,5 @@
 .live-status strong{font-size:14px}
 .capture-note{font-size:11px}
 @media(max-width:650px){.assistant-metric>strong{font-size:32px}.assistant-prompts button{font-size:11px}.simulation-instructions{flex-direction:row;align-items:center}.simulation-instructions .button{font-size:11px;padding:10px}.simulation-step-track{gap:12px}.simulation-step-track>span{font-size:10px}.simulation-instructions small{max-width:150px;overflow-wrap:anywhere}}
+
+.language-switch{display:flex;align-items:center;gap:5px;color:var(--teal)}.language-switch select{margin:0;padding:7px 22px 7px 8px;font-size:12px;min-height:35px;width:auto;background:#fff}.language-switch svg{flex-shrink:0}@media(max-width:650px){.topbar{padding-inline:12px}.topbar>div:first-child{font-size:10px;gap:5px}.language-switch select{font-size:11px;padding:6px;max-width:88px}.language-switch svg{display:none}.topbar-actions{gap:6px!important}}

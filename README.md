@@ -45,6 +45,10 @@ En Linux/macOS, sustituir `.\.venv\Scripts\python.exe` por `.venv/bin/python`.
 
 Abrir http://127.0.0.1:8000, abrir **Probar el flujo continuo sin usar una cámara** y pulsar **Iniciar señal simulada**. El visitante de la web publicada solo abre el enlace; estos comandos son para desarrollo.
 
+### Idiomas
+
+La web abre en inglés por defecto. El selector **English / Español** cambia la interfaz sin recargar la página y recuerda la preferencia en este navegador. Los PDF se descargan en el idioma seleccionado. Alias, notas escritas y datos de medición se conservan sin traducción ni conversión; `lpm` se muestra como `bpm` en inglés. El catálogo de traducciones se comparte en `shared/i18n`.
+
 ### Acceso directo e historial
 
 La primera pantalla es la cámara en vivo. No hay cuentas, registro, contraseña ni botón de entrada. El navegador recibe automáticamente un espacio privado con una cookie de 30 días por defecto, renovable al abrir la web mientras siga vigente. Al caducar o borrar la cookie se abre un espacio nuevo; el historial anterior no se recupera desde la interfaz ni se sincroniza entre dispositivos. Descargar el PDF permite conservar una copia del informe.

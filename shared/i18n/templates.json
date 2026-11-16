@@ -1,0 +1,114 @@
+[
+  {
+    "es": "Siguiente: {0}",
+    "en": "Next: {0}"
+  },
+  {
+    "es": "Medición: {0}",
+    "en": "Measured: {0}"
+  },
+  {
+    "es": "Registro: {0}",
+    "en": "Recorded: {0}"
+  },
+  {
+    "es": "Unidad de {0}",
+    "en": "Unit for {0}"
+  },
+  {
+    "es": "Pantalla ficticia de {0}",
+    "en": "Fictional display: {0}"
+  },
+  {
+    "es": "Comprobaciones consistentes: {0} de {1}",
+    "en": "Consistent checks: {0} of {1}"
+  },
+  {
+    "es": "Últimas {0} confirmaciones de {1}",
+    "en": "Last {0} confirmed readings of {1}"
+  },
+  {
+    "es": "{0} horas",
+    "en": "{0} hours"
+  },
+  {
+    "es": "{0} × {1} px recibidos. ",
+    "en": "{0} × {1} px received. "
+  },
+  {
+    "es": "{0} {1} vs. anterior",
+    "en": "{0} {1} vs. previous"
+  },
+  {
+    "es": "{0} registro confirmado de {1} categoría de instrumento para este alias.",
+    "en": "{0} confirmed record from {1} device category for this alias."
+  },
+  {
+    "es": "{0} registros confirmados de {1} categoría de instrumento para este alias.",
+    "en": "{0} confirmed records from {1} device category for this alias."
+  },
+  {
+    "es": "{0} registros confirmados de {1} categorías de instrumento para este alias.",
+    "en": "{0} confirmed records from {1} device categories for this alias."
+  },
+  {
+    "es": "Reuní {0} registro confirmado para {1}. A continuación se muestran la evidencia disponible y los siguientes pasos.",
+    "en": "Loaded {0} confirmed record for {1}. Evidence and next steps appear below."
+  },
+  {
+    "es": "Reuní {0} registros confirmados para {1}. A continuación se muestran la evidencia disponible y los siguientes pasos.",
+    "en": "Loaded {0} confirmed records for {1}. Evidence and next steps appear below."
+  },
+  {
+    "es": "Sueño declarado: {0} horas. Es un autorreporte; no prueba un trastorno del sueño.",
+    "en": "Reported sleep: {0} hours. This is self-reported and does not establish a sleep disorder."
+  },
+  {
+    "es": "Registraste {0} horas. Compara este descanso con tu horario previsto y documenta somnolencia o dificultades para dormir.",
+    "en": "You reported {0} hours. Compare with your planned schedule and record drowsiness or sleep difficulties."
+  },
+  {
+    "es": "Hay {0} lecturas automáticas guardadas sin revisión; se muestran por separado y no alimentan las comparaciones confirmadas.",
+    "en": "There are {0} unreviewed automatic readings. They appear separately and do not contribute to confirmed comparisons."
+  },
+  {
+    "es": "Para completar tu seguimiento: {0} Sigue las mediciones previstas en tu plan de misión; las recomendaciones explican su propósito.",
+    "en": "To complete your follow-up: {0} Follow your mission measurement plan. Recommendations explain their purpose.",
+    "translate": [
+      0
+    ]
+  },
+  {
+    "es": "Entre las últimas confirmaciones comparables: {0}. Un aumento o descenso no equivale a un diagnóstico; revisa tiempos, técnica y contexto.",
+    "en": "Latest comparable confirmed readings: {0}. A change is not a diagnosis. Check timing, technique and context.",
+    "translate": [
+      0
+    ]
+  },
+  {
+    "es": "Todavía faltan confirmaciones comparables. Un aumento o descenso no equivale a un diagnóstico; revisa tiempos, técnica y contexto.",
+    "en": "Comparable confirmed readings are still needed. A change is not a diagnosis. Check timing, technique and context."
+  },
+  {
+    "es": "Has marcado señales de alarma: {0}.",
+    "en": "You reported warning signs: {0}.",
+    "translate": [
+      0
+    ]
+  },
+  {
+    "es": "Hay señales de alarma declaradas. Solicita ayuda médica ahora. {0}",
+    "en": "Warning signs reported. Get medical help now. {0}",
+    "translate": [
+      0
+    ]
+  },
+  {
+    "es": "Hay varios valores posibles para {0}; revisa la pantalla y confirma manualmente.",
+    "en": "Multiple possible values for {0}. Check the display and confirm manually."
+  },
+  {
+    "es": "Hay varios valores posibles para {0}; revisa la imagen.",
+    "en": "Multiple possible values for {0}. Review the image."
+  }
+]

@@ -24,8 +24,8 @@ def test_full_real_ocr_confirmation_history_and_report(visitor_client,capture):
     assert pdf.status_code==200
     assert pdf.headers['content-type']=='application/pdf'
     text='\n'.join(page.extract_text() for page in PdfReader(BytesIO(pdf.content)).pages)
-    assert 'ASTRO-01' in text and 'FICTICIOS' in text and '120' in text
-    assert 'hora desconocida' in text
+    assert 'ASTRO-01' in text and 'FICTIONAL' in text and '120' in text
+    assert 'unknown time' in text
 
 
 def test_another_browser_cannot_read_evidence_history_or_report(application,visitor_client,capture):

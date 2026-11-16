@@ -18,7 +18,7 @@ We improved the capture path to preserve more detail, added an adjustable readin
 
 ## Slide 5
 
-The demonstration does not depend on the lighting at the event. We click Simulación, and the same OCR processes three synthetic screens. The scenario contains a baseline blood pressure, a follow-up and an oximeter reading. The application labels all values and times as fictional and stores scripted provenance. The guide then takes us through history, the assistant and the report. This demonstrates the software workflow, not accuracy on real instruments.
+The demonstration does not depend on the lighting at the event. We click Simulation, and the same OCR processes three synthetic screens. The scenario contains a baseline blood pressure, a follow-up and an oximeter reading. The application labels all values and times as fictional and stores scripted provenance. The guide then takes us through history, the assistant and the report. This demonstrates the software workflow, not accuracy on real instruments.
 
 ## Slide 6
 
@@ -42,10 +42,10 @@ Our evidence supports the software workflow: live frame processing, automatic ob
 
 ## Live demonstration checklist
 
-1. Open the deployed web app and click Simulación.
+1. Open the deployed web app and click Simulation.
 2. Explain that the three screens and their measurement times are fictional.
-3. Click Siguiente: Historial and show the two blood pressure records.
-4. Click Siguiente: Asistente and select Cambios to show +6 and +2 mmHg.
+3. Click Next: History and show the two blood pressure records.
+4. Click Next: Assistant and select Changes to show +6 and +2 mmHg.
 5. Point out the source links and missing-data limitations.
-6. Continue to Informe and download the sample PDF.
+6. Continue to Report and download the sample PDF.
 7. Return to the camera. If demonstrating a real instrument, fill the frame with its complete display, including labels and units. Adjust the angle to remove glare.

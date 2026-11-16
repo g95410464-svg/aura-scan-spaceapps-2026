@@ -373,12 +373,13 @@ def create_app(settings: Settings | None = None):
         return {'id':item.id,'created_at':item.created_at}
 
     @app.get('/api/measurements/{record_id}/report.pdf')
-    def report(record_id: str,workspace=Depends(get_workspace),db=Depends(get_db)):
+    def report(record_id: str,lang: Literal['en','es']='en',workspace=Depends(get_workspace),db=Depends(get_db)):
         record=db.scalar(select(Measurement).where(Measurement.id==record_id,Measurement.owner_id==workspace.id))
         if not record:raise HTTPException(404,'Informe no encontrado.')
         capture=db.get(Capture,record.capture_id)
-        return Response(render_report(record,capture),media_type='application/pdf',
-                        headers={'Content-Disposition':f'attachment; filename="aura-informe-{record.id[:8]}.pdf"'})
+        filename='report' if lang=='en' else 'informe'
+        return Response(render_report(record,capture,lang),media_type='application/pdf',
+                        headers={'Content-Language':lang,'Content-Disposition':f'attachment; filename="aura-{filename}-{record.id[:8]}.pdf"'})
 
     if (config.frontend_dir/'assets').exists():
         app.mount('/assets',StaticFiles(directory=config.frontend_dir/'assets'),name='assets')

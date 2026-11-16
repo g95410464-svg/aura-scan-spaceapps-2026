@@ -26,7 +26,7 @@ def test_guided_simulation_runs_real_ocr_and_builds_isolated_history(visitor_cli
     pdf=visitor_client.get(f'/api/measurements/{result["report_id"]}/report.pdf')
     assert pdf.status_code==200
     text=' '.join(p.extract_text() for p in PdfReader(BytesIO(pdf.content)).pages)
-    assert 'FICTICIOS' in text and 'Simulación guionada' in text
+    assert 'FICTIONAL' in text and 'Scripted simulation' in text
     with TestClient(application) as other:
         open_workspace(other)
         assert other.get(result['screens'][0]['image_url']).status_code==404
