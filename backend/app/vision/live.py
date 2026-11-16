@@ -61,8 +61,13 @@ def advance(state, result, now, is_demo):
                  and r.get('confidence',0)>=MIN_CONFIDENCE for r in fields))
     if not valid:
         state.update(candidate=None,candidate_reading=None,count=0,first_seen=now,last_seen=now)
+        message='Incluye etiquetas y unidades en el encuadre. Mantén la pantalla quieta, sin modo memoria.'
+        if quality.get('sharpness',100)<20:message='La imagen está poco definida. Acerca el instrumento, apoya el teléfono y espera al enfoque.'
+        elif quality.get('brightness',100)<25:message='Falta luz sobre la pantalla. Usa iluminación lateral suave y evita el flash directo.'
+        elif quality.get('bright_fraction',0)>.15 or quality.get('brightness',100)>245:message='Posible reflejo o sobreexposición. Inclina un poco la pantalla o la cámara hasta que vuelvan a verse los números.'
+        elif result.get('recognition')=='ambiguous':message='El OCR obtiene valores contradictorios. Cambia el ángulo y centra solo la pantalla.'
         return state, {'status':'searching','count':0,'target':MIN_FRAMES,'fields':fields,
-                       'message':'Buscando etiquetas, unidades y valores legibles. Mantén la pantalla quieta, sin reflejos ni modo memoria.'}, False
+                       'message':message,'quality':quality,'warnings':result.get('warnings',[])}, False
     readings = [{'code':r['code'],'value':r['value'],'unit':r['unit']} for r in fields]
     current={'device':device,'demo':is_demo,'readings':readings}
     signature = hashlib.sha256(json.dumps([device,is_demo,readings],sort_keys=True).encode()).hexdigest()
@@ -85,4 +90,4 @@ def advance(state, result, now, is_demo):
             state.update(last_saved=signature,saved_reading=current,saved_at=now)
             save=True
     return state, {'status':status,'count':count,'target':MIN_FRAMES,'fields':fields,
-                   'device_type':device,'message':message}, save
+                   'device_type':device,'message':message,'quality':quality,'warnings':result.get('warnings',[])}, save

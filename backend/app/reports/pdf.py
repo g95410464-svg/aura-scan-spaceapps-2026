@@ -38,7 +38,7 @@ def render_report(measurement,capture):
     rows=[['Indicador','Valor','Unidad','Procedencia']]
     for r in measurement.readings:
         rows.append([FIELDS[r['code']]['label'],str(r['value']),r['unit'],
-                     'OCR confirmado' if r['provenance']=='ocr_confirmed' else 'Revisado / introducido'])
+                     'OCR confirmado' if r['provenance']=='ocr_confirmed' else 'Simulación guionada' if r['provenance']=='simulation_scripted' else 'Revisado / introducido'])
     wrapped=[[Paragraph(escape(v),styles['BodyText']) for v in row] for row in rows]
     table=Table(wrapped,colWidths=[175,70,70,192],repeatRows=1,hAlign='LEFT')
     table.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,0),colors.HexColor('#dceee8')),

@@ -23,6 +23,9 @@ export function LiveMonitor({ devices, pending, onSaved, onReview, onFollowUp }:
   const [notice,setNotice] = useState('');
   const [frame,setFrame] = useState<LiveFrame | null>(null);
   const [saved,setSaved] = useState<LiveReading[]>([]);
+  const [zoom,setZoom] = useState(1);
+  const zoomRef=useRef(1);
+  const [resolution,setResolution] = useState({width:0,height:0});
   const video = useRef<HTMLVideoElement>(null);
   const media = useRef<MediaStream | null>(null);
   const demoImage = useRef<HTMLImageElement | null>(null);
@@ -60,10 +63,13 @@ export function LiveMonitor({ devices, pending, onSaved, onReview, onFollowUp }:
     const width=source==='demo'?demoImage.current?.naturalWidth:video.current?.videoWidth;
     const height=source==='demo'?demoImage.current?.naturalHeight:video.current?.videoHeight;
     if(!image||!width||!height){halt('No se pudo recibir imagen de la cámara. Revisa el dispositivo e inicia de nuevo.');return;}
-    const canvas=document.createElement('canvas');const scale=Math.min(1,1280/Math.max(width,height));
-    canvas.width=Math.round(width*scale);canvas.height=Math.round(height*scale);
-    canvas.getContext('2d')!.drawImage(image,0,0,canvas.width,canvas.height);
-    const blob=await new Promise<Blob | null>(resolve=>canvas.toBlob(resolve,'image/jpeg',.9));
+    const magnification=source==='camera'?zoomRef.current:1;
+    const cropWidth=width/magnification,cropHeight=height/magnification;
+    const canvas=document.createElement('canvas');const scale=Math.min(1,2048/Math.max(cropWidth,cropHeight));
+    canvas.width=Math.round(cropWidth*scale);canvas.height=Math.round(cropHeight*scale);
+    canvas.getContext('2d')!.drawImage(image,(width-cropWidth)/2,(height-cropHeight)/2,cropWidth,cropHeight,0,0,canvas.width,canvas.height);
+    let blob=await new Promise<Blob | null>(resolve=>canvas.toBlob(resolve,'image/jpeg',.94));
+    if(blob&&blob.size>1.9*1024*1024)blob=await new Promise<Blob | null>(resolve=>canvas.toBlob(resolve,'image/jpeg',.8));
     if(run!==generation.current)return;
     if(!blob){halt('No se pudo leer el fotograma. Inicia de nuevo la cámara.');return;}
     const abort=new AbortController();controller.current=abort;
@@ -94,9 +100,14 @@ export function LiveMonitor({ devices, pending, onSaved, onReview, onFollowUp }:
     try {
       if(source==='camera'){
         if(!navigator.mediaDevices?.getUserMedia)throw new Error('La cámara necesita HTTPS y un navegador compatible.');
-        acquired=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:960}},audio:false});
+        acquired=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:2560},height:{ideal:1440},frameRate:{ideal:15,max:30}},audio:false});
         if(run!==generation.current){acquired.getTracks().forEach(t=>t.stop());return;}
         media.current=acquired;
+        const track=acquired.getVideoTracks()[0];
+        const capabilities=track.getCapabilities?.() as MediaTrackCapabilities & {focusMode?:string[];exposureMode?:string[];whiteBalanceMode?:string[]};
+        const tuning:Record<string,string>={};
+        for(const key of ['focusMode','exposureMode','whiteBalanceMode'] as const)if(capabilities?.[key]?.includes('continuous'))tuning[key]='continuous';
+        if(Object.keys(tuning).length)await track.applyConstraints({advanced:[tuning as MediaTrackConstraintSet]}).catch(()=>{});
         acquired.getVideoTracks().forEach(t=>t.addEventListener('ended',()=>halt('El navegador o el dispositivo cerró la cámara.')));
       }else{
         const image=new Image();image.src='/api/live/demo-screen';await image.decode();
@@ -122,10 +133,12 @@ export function LiveMonitor({ devices, pending, onSaved, onReview, onFollowUp }:
     {error&&<div role="alert" className="notice error"><Info size={17}/>{error}</div>}
     {notice&&<div className="notice small"><Info size={16}/>{notice}</div>}
     <div className="live-layout"><section className="capture-panel live-camera-panel"><div className="panel-title compact"><div><h2>{mode==='demo'?'Señal de prueba simulada':active?'Cámara en vivo':'Enfoca la pantalla del instrumento'}</h2><p>{active?'Lectura periódica · Sin audio · Puedes detenerla en cualquier momento.':'Buena luz, números y unidades visibles; evita reflejos y modo memoria.'}</p></div><span className={`live-indicator ${active?'active':''}`}><span/>{active?'EN VIVO':'EN ESPERA'}</span></div>
-      <div className="viewfinder live-viewfinder">{mode==='camera'?<video ref={video} autoPlay playsInline muted onLoadedData={()=>beginPolling('camera')}/>:mode==='demo'?<img src="/api/live/demo-screen" alt="Pantalla sintética repetida para demostrar la lectura automática; no es una cámara real"/>:<div className="scan-corners"><ScanLine size={58} strokeWidth={1}/><span>Reloj, oxímetro, tensiómetro<br/>o instrumento compatible</span></div>}{active&&<span className="live-overlay"><span className={analyzing?'status-dot pulse-dot':'status-dot'}/>{mode==='demo'?'DATOS FICTICIOS / SEÑAL SIMULADA':analyzing?'ANALIZANDO PANTALLA':'ESPERANDO SIGUIENTE LECTURA'}</span>}</div>
+      <div className="viewfinder live-viewfinder" style={mode==='camera'&&resolution.width?{aspectRatio:`${resolution.width}/${resolution.height}`}:undefined}>{mode==='camera'?<><video ref={video} autoPlay playsInline muted onLoadedMetadata={()=>setResolution({width:video.current?.videoWidth??0,height:video.current?.videoHeight??0})} onLoadedData={()=>beginPolling('camera')}/><div className="reading-roi" style={{inset:`${(1-1/zoom)*50}%`}} aria-hidden="true"/></>:mode==='demo'?<img src="/api/live/demo-screen" alt="Pantalla sintética repetida para demostrar la lectura automática; no es una cámara real"/>:<div className="scan-corners"><ScanLine size={58} strokeWidth={1}/><span>Reloj, oxímetro, tensiómetro<br/>o instrumento compatible</span></div>}{active&&<span className="live-overlay"><span className={analyzing?'status-dot pulse-dot':'status-dot'}/>{mode==='demo'?'DATOS FICTICIOS / SEÑAL SIMULADA':analyzing?'ANALIZANDO PANTALLA':'ESPERANDO SIGUIENTE LECTURA'}</span>}</div>
+      <div className="camera-quality-controls"><label>Área de lectura <strong>{zoom.toFixed(1)}×</strong><input type="range" aria-label="Acercar área de lectura" min="1" max="3" step="0.1" value={zoom} disabled={mode==='demo'} onChange={e=>{const value=Number(e.target.value);setZoom(value);zoomRef.current=value;}}/></label><p>{resolution.width&&mode==='camera'?`${resolution.width} × ${resolution.height} px recibidos. `:''}Centra toda la pantalla, incluidas las etiquetas y unidades, en el marco. Si hay reflejo, cambia ligeramente el ángulo; no uses flash directo.</p></div>
       <div className="capture-controls">{active?<button className="button primary" onClick={()=>halt('Lectura detenida. Las observaciones guardadas siguen en el historial.')}><Pause size={17}/> Detener lectura</button>:starting?<button className="button secondary" onClick={()=>halt('Inicio cancelado.')}><LoaderCircle className="spin" size={17}/> Cancelar inicio</button>:<button className="button primary" onClick={()=>void start('camera')}><Camera size={17}/> Iniciar cámara en vivo</button>}</div>
       <div className="capture-note"><ShieldCheck size={17}/><span>La cámara permanece activa. Se analizan fotogramas espaciados; solo se conserva la evidencia de las lecturas guardadas. No se graba un video.</span></div>
       <div className="live-status" role="status"><div><Activity size={18}/><strong>{frame?.message??'Al iniciar, busca una lectura y espera a que sea consistente en al menos tres fotogramas.'}</strong></div><div className="stability-progress" aria-label={`Comprobaciones consistentes: ${frame?.count??0} de ${frame?.target??3}`}>{[0,1,2].map(i=><span className={(frame?.count??0)>i?'complete':''} key={i}/>)}</div><small>{frame?.count??0} / {frame?.target??3} comprobaciones · La estabilidad no certifica precisión médica.</small></div>
+      {frame?.warnings?.length? <div className="camera-hints">{frame.warnings.slice(0,2).map(w=><p key={w}><Info size={13}/>{w}</p>)}</div>:null}
       <details className="live-demo"><summary>Probar el flujo continuo sin usar una cámara</summary><p>Repite una pantalla generada por el mismo circuito de OCR, estabilidad y registro. Los datos se guardan como ficticios.</p><button className="button secondary" disabled={active||starting} onClick={()=>void start('demo')}><Play size={15}/> Iniciar señal simulada</button></details>
     </section><section className="live-side"><div className="review-panel"><div className="panel-title compact"><div><span className="eyebrow">ANTES DE INICIAR</span><h2>¿A quién corresponden las lecturas?</h2></div><ClipboardList size={21}/></div><div className="live-settings"><label>Alias del astronauta<input value={subject} onChange={e=>setSubject(e.target.value)} maxLength={80} placeholder="ej. ASTRO-01" disabled={active||starting}/></label><label>Tipo de instrumento<select value={category} onChange={e=>setCategory(e.target.value)} disabled={active||starting}><option value="auto">Identificar por etiquetas</option>{devices.map(d=><option key={d.id} value={d.id}>{d.label}</option>)}</select></label><label className="checkbox"><input type="checkbox" checked={declaredDemo} onChange={e=>setDeclaredDemo(e.target.checked)} disabled={active||starting}/> Estoy usando datos ficticios.</label>{mode==='demo'&&<p className="input-hint">La señal simulada se guarda siempre como ficticia.</p>}</div><div className="live-current"><span className="eyebrow">LECTURA EN PANTALLA / SIN VALIDAR</span>{frame?.fields.length?<div className="live-values">{frame.fields.map(f=><div key={f.code}><span>{fieldNames[f.code]??f.code}</span><strong>{f.value}<small>{f.unit??'unidad sin leer'}</small></strong></div>)}</div>:<div className="inline-empty"><Activity size={22}/><p>Los valores aparecerán mientras enfoques la pantalla, sin pulsar un botón de captura.</p></div>}</div></div>
       <div className="live-saved"><div className="section-heading"><h2><Check size={17}/> Guardadas automáticamente</h2><span className="eyebrow">{saved.length} EN ESTA SESIÓN</span></div><p className="input-hint">Sin duplicar valores iguales o prácticamente iguales mientras continúen en pantalla. Se guardan como observaciones pendientes de revisión.</p>{visibleSaved.length?<LiveReadings items={visibleSaved} onReview={r=>{halt();onReview(r);}} onFollowUp={s=>{halt();onFollowUp(s);}}/>:<div className="live-empty">El registro aparece aquí cuando los valores y las unidades se mantienen estables.</div>}</div>

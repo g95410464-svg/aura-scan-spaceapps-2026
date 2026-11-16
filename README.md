@@ -2,7 +2,7 @@
 
 Prototipo ejecutable de una web de lectura visual en vivo de instrumentos médicos para el reto de salud espacial de NASA Space Apps 2026. Nombre de trabajo; sin afiliación ni aprobación de NASA.
 
-**Estado 0.4:** interfaz React/TypeScript, API FastAPI, OCR real en Python, confirmación de lecturas, historial privado e informes PDF. Aplicación publicada en Railway; repositorio público.
+**Estado 0.5:** interfaz React/TypeScript, API FastAPI, OCR real en Python, confirmación de lecturas, historial privado e informes PDF. Aplicación publicada en Railway; repositorio público.
 
 Web: https://aura-scan-spaceapps-2026-production.up.railway.app/
 
@@ -22,7 +22,8 @@ Repositorio: https://github.com/g95410464-svg/aura-scan-spaceapps-2026
 - Asistente de recomendaciones que reúne lecturas confirmadas por alias, contexto de misión, descanso, ánimo y antecedentes declarados.
 - Recomendaciones por reglas con razones y referencias NASA/CSA; FDA y MedlinePlus complementan calidad de medición y señales de alarma declaradas.
 - Cronología, diferencias numéricas entre confirmaciones comparables y datos faltantes; no hay diagnóstico automático.
-- Demostración con pantalla sintética procesada por el mismo OCR, identificada como ficticia.
+- Botón Simulación visible que ejecuta tres pantallas sintéticas con OCR real y guía por historial, asistente e informe; datos ficticios separados.
+- Más resolución, área de lectura ajustable, controles de enfoque disponibles y segunda pasada de contraste si faltan campos.
 
 **Límite de la versión:** no hay clasificador entrenado de modelos exactos, conjunto Datumo/Smart Scan integrado, diagnóstico médico ni tratamiento validado. La prueba sintética no demuestra precisión sobre instrumentos reales ni de la ISS. El sistema no completa una unidad ausente por suposición; pide revisión.
 
@@ -72,7 +73,7 @@ La versión inicial crea las tablas ausentes al iniciar; no incluye migraciones 
 
 ## Objetivo del producto
 
-La entrega prevista es una web publicada donde el astronauta muestra la pantalla de un instrumento médico a la cámara. La versión 0.4 interpreta etiquetas, valores y unidades, y prepara una lectura para confirmación; la identificación de modelos exactos sigue pendiente. La observación estable se guarda automáticamente sin revisar; la revisión posterior permite incorporarla a las mediciones confirmadas y al informe.
+La entrega prevista es una web publicada donde el astronauta muestra la pantalla de un instrumento médico a la cámara. La versión 0.5 interpreta etiquetas, valores y unidades, y prepara una lectura para confirmación; la identificación de modelos exactos sigue pendiente. La observación estable se guarda automáticamente sin revisar; la revisión posterior permite incorporarla a las mediciones confirmadas y al informe.
 
 En el despliegue final, el usuario abrirá un enlace sin instalar Python ni iniciar servicios locales.
 
@@ -83,6 +84,7 @@ En el despliegue final, el usuario abrirá un enlace sin instalar Python ni inic
 - [Requisitos y límites del MVP](docs/REQUISITOS.md)
 - [Fuentes y función de los cinco recursos](docs/FUENTES.md)
 - [Modelo de datos inicial](docs/MODELO_DATOS.md)
+- [Demostración guiada y manejo de reflejos](docs/DEMOSTRACION.md)
 - [Flujo de cámara en vivo y registro automático](docs/LECTURA_EN_VIVO.md)
 - [Funcionamiento y límites del asistente](docs/ASISTENTE.md)
 - [Estado real, comprobaciones y pendientes](docs/ESTADO.md)

@@ -1,4 +1,4 @@
-# Estado de la versión 0.4
+# Estado de la versión 0.5
 
 Fecha: 14 de noviembre de 2026.
 
@@ -17,7 +17,7 @@ Fecha: 14 de noviembre de 2026.
 
 ## Verificado localmente
 
-- 44 pruebas de backend: OCR sobre pantalla sintética, confirmación, auditoría, unidades, ausencia de hora, PDF, aislamiento entre navegadores, caducidad y ausencia de endpoints de cuentas y CSRF.
+- 50 pruebas de backend: OCR sobre pantalla sintética, confirmación, auditoría, unidades, ausencia de hora, PDF, aislamiento entre navegadores, caducidad y ausencia de endpoints de cuentas y CSRF.
 - Compilación TypeScript y Vite.
 - Backend e interfaz aprobados también en GitHub Actions sobre Linux para el commit inicial.
 - En navegador para la versión 0.4: entrada directa sin cuenta, demostración con OCR, confirmación, informe en pantalla y recarga seguida de historial conservado. Además, se comprobó el formulario de contexto, las recomendaciones según entorno/descanso/ánimo y su cronología.
@@ -49,3 +49,7 @@ El asistente usa reglas revisables y referencias, no un modelo diagnóstico o ch
 ## Cámara en vivo 0.4
 
 La entrada principal mantiene la cámara abierta y registra automáticamente valores estables, sin disparador manual. Las observaciones sin revisar se conservan separadas de las mediciones confirmadas. La señal sintética continua se comprobó en navegador: un registro automático, deduplicación al continuar la misma pantalla y detención del flujo. Faltan pruebas de exactitud con cámara e instrumentos físicos; ver `LECTURA_EN_VIVO.md`.
+
+## Entrega 0.5
+
+Simulación guiada con tres lecturas sintéticas procesadas por OCR, historial aislado, contexto, recomendaciones y PDF con procedencia guionada. Mejoras de entrada de imagen y contraste, indicaciones de reflejo y normalización de geometría. No resuelven reflejos que oculten datos ni sustituyen la evaluación de dispositivos reales.

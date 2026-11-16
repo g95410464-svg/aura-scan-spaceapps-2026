@@ -69,3 +69,8 @@ def test_smartwatch_is_declared_not_inferred_from_appearance():
     assert result['fields'][0]['value']==72
     assert result['device_model'] is None
     assert any('no verifica' in warning for warning in result['warnings'])
+
+
+def test_common_oximeter_label_zero_is_normalized_without_changing_value():
+    result=parse_tokens([token('Sp02',40),token('98',300),token('%',450)])
+    assert result['fields'][0]['code']=='spo2' and result['fields'][0]['value']==98

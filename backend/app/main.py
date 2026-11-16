@@ -1,6 +1,7 @@
 import secrets
 import time
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone, timedelta
 from fastapi import FastAPI, Request, Response, Depends, HTTPException, UploadFile, File, Form, Query
 from typing import Literal
 from fastapi.responses import FileResponse, JSONResponse
@@ -10,7 +11,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import IntegrityError
 from backend.app.core.settings import Settings
 from backend.app.core.security import get_workspace, get_db, limit_attempts, digest, origin_key
-from backend.app.storage.models import Base, Workspace, BrowserSession, Capture, Measurement, AuditEvent, HealthContext, LiveSession, LiveReading, now_iso
+from backend.app.storage.models import Base, Workspace, BrowserSession, Capture, Measurement, AuditEvent, HealthContext, LiveSession, LiveReading, SimulationRun, now_iso
 from backend.app.measurements.schemas import Confirmation
 from backend.app.devices.catalog import catalog, DEVICES
 from backend.app.vision.reader import sanitize_image, analyze_image, analyze_bytes, ImageRejected
@@ -19,6 +20,7 @@ from backend.app.vision.demo import demo_image
 from backend.app.assessments.evaluate import evaluate
 from backend.app.assessments.assistant import build_assistant
 from backend.app.assessments.schemas import ContextInput
+from backend.app.assessments.simulation import SimulationRequest, SCENARIOS
 from backend.app.knowledge.sources import SOURCES
 from backend.app.reports.pdf import render_report
 
@@ -36,7 +38,7 @@ def create_app(settings: Settings | None = None):
         Base.metadata.create_all(engine)
         yield
         engine.dispose()
-    app=FastAPI(title='AURA Scan',version='0.4.0',lifespan=lifespan,docs_url=None,redoc_url=None,
+    app=FastAPI(title='AURA Scan',version='0.5.0',lifespan=lifespan,docs_url=None,redoc_url=None,
                 description='Captura visual experimental de instrumentos. Sin diagnóstico clínico validado.')
     app.state.db_session=sessionmaker(engine,expire_on_commit=False)
     app.state.settings=config
@@ -69,7 +71,7 @@ def create_app(settings: Settings | None = None):
 
     @app.get('/api/health')
     def health():
-        return {'status':'ok','version':'0.4.0','clinical_validation':False,'dataset_integrated':False}
+        return {'status':'ok','version':'0.5.0','clinical_validation':False,'dataset_integrated':False}
 
     @app.get('/api/session')
     def browser_session(request: Request,response: Response,db=Depends(get_db)):
@@ -199,7 +201,7 @@ def create_app(settings: Settings | None = None):
         content=file.file.read(2*1024*1024+1)
         if len(content)>2*1024*1024: raise HTTPException(413,'El fotograma excede 2 MB.')
         try:
-            normalized=sanitize_image(content)
+            normalized=sanitize_image(content,max_dimension=2048)
         except ImageRejected as exc:
             raise HTTPException(422,str(exc))
         try:
@@ -283,6 +285,55 @@ def create_app(settings: Settings | None = None):
     def history(workspace=Depends(get_workspace),db=Depends(get_db)):
         records=db.scalars(select(Measurement).where(Measurement.owner_id==workspace.id).order_by(Measurement.created_at.desc()).limit(100)).all()
         return {'items':[serialize(r) for r in records]}
+
+    @app.post('/api/simulation/run')
+    def run_simulation(data: SimulationRequest,request: Request,workspace=Depends(get_workspace),db=Depends(get_db)):
+        existing=db.scalar(select(SimulationRun).where(SimulationRun.owner_id==workspace.id,SimulationRun.run_key==str(data.run_key)))
+        if existing:return existing.result
+        limit_attempts(request,'simulation',20,3600)
+        run=SimulationRun(owner_id=workspace.id,run_key=str(data.run_key))
+        db.add(run)
+        try: db.flush()
+        except IntegrityError:
+            db.rollback()
+            existing=db.scalar(select(SimulationRun).where(SimulationRun.owner_id==workspace.id,SimulationRun.run_key==str(data.run_key)))
+            if existing:return existing.result
+            raise HTTPException(409,'La simulación ya se está preparando. Vuelve a intentar.')
+        alias=f'DEMO-AURA-{run.id[:6].upper()}'
+        records=[];screens=[];paths=[]
+        try:
+            for scenario in SCENARIOS:
+                image=demo_image(scenario['device_type'],scenario['values'])
+                recognized=analyze_bytes(image,scenario['device_type'])
+                actual={f['code']:f['value'] for f in recognized['fields'] if f.get('unit') is not None}
+                if actual!=scenario['expected'] or recognized['recognition']!='visible_labels':
+                    raise HTTPException(503,'La pantalla de prueba no se pudo leer con consistencia. Vuelve a intentar la simulación.')
+                capture=Capture(owner_id=workspace.id,device_type=scenario['device_type'],is_demo=True,status='simulated',result={**recognized,'origin':'guided_simulation'})
+                db.add(capture);db.flush()
+                path=config.storage_dir/f'{capture.id}.png';paths.append(path);path.write_bytes(image)
+                readings=[{'code':f['code'],'value':f['value'],'unit':f['unit'],'provenance':'simulation_scripted'} for f in recognized['fields']]
+                measured_at=(datetime.now(timezone.utc)-timedelta(minutes=scenario['minutes_ago'])).isoformat()
+                previous=next((r for r in reversed(records) if r.device_type==scenario['device_type']),None)
+                symptoms='FICTITIOUS DEMO: exercise simulation and tiredness. Values and times are scripted, not patient data.'
+                assessment=evaluate(readings,symptoms,measured_at,previous)
+                assessment['findings'].insert(0,'Registro guionado de simulación con OCR real sobre pantalla sintética; sin revisión clínica ni medición física.')
+                record=Measurement(owner_id=workspace.id,capture_id=capture.id,subject_alias=alias,device_type=scenario['device_type'],is_demo=True,
+                                   measured_at=measured_at,readings=readings,symptoms=symptoms,assessment=assessment)
+                db.add(record);db.flush();records.append(record)
+                db.add(AuditEvent(owner_id=workspace.id,capture_id=capture.id,action='simulation_created',detail={'run_id':run.id,'human_reviewed':False,'is_demo':True}))
+                screens.append({'title':scenario['title'],'image_url':f'/api/captures/{capture.id}/image','readings':readings,'record_id':record.id})
+            context=HealthContext(owner_id=workspace.id,subject_alias=alias,is_demo=True,environment='station',sleep_hours=6,mood='strained',
+                                  symptoms='Fictional training scenario: tiredness after simulated activity.',medical_notes='FICTITIOUS SCENARIO. No real diagnosis or treatment.',red_flags=[])
+            db.add(context)
+            run.result={'id':run.id,'subject_alias':alias,'is_demo':True,'screens':screens,'records':[serialize(r) for r in records],
+                        'report_id':records[1].id,'notice':'Escenario guionado con OCR real de pantallas sintéticas. No representa pacientes ni valida precisión clínica.'}
+            db.commit()
+            return run.result
+        except Exception:
+            db.rollback()
+            for path in paths:
+                if path.exists():path.unlink()
+            raise
 
     @app.get('/api/assistant/subjects')
     def subjects(workspace=Depends(get_workspace),db=Depends(get_db)):

@@ -17,7 +17,7 @@ class ImageRejected(ValueError):
     pass
 
 
-def sanitize_image(content: bytes) -> bytes:
+def sanitize_image(content: bytes, max_dimension: int = 1600) -> bytes:
     try:
         with warnings.catch_warnings():
             warnings.simplefilter('error', Image.DecompressionBombWarning)
@@ -27,7 +27,7 @@ def sanitize_image(content: bytes) -> bytes:
                 if original.width * original.height > 12_000_000 or min(original.size) < 64:
                     raise ImageRejected('La imagen debe tener al menos 64 px por lado y como máximo 12 megapíxeles.')
                 image = ImageOps.exif_transpose(original).convert('RGB')
-                image.thumbnail((1600, 1600))
+                image.thumbnail((max_dimension, max_dimension))
                 output = io.BytesIO()
                 image.save(output, format='PNG')
                 return output.getvalue()
@@ -42,7 +42,7 @@ def _norm(s):
 def parse_tokens(tokens: list[dict], selected_type: str = 'auto') -> dict:
     """Associate only explicit labels and units, never just digit order or appearance."""
     aliases = {'systolic': {'SYS', 'SYSTOLIC'}, 'diastolic': {'DIA', 'DIASTOLIC'},
-               'pulse': {'PUL', 'PULSE', 'PR', 'BPM', 'PRBPM', 'HR', 'HEARTRATE'}, 'spo2': {'SPO2', 'SPO2%', '%SPO2'}}
+               'pulse': {'PUL', 'PULSE', 'PR', 'BPM', 'PRBPM', 'HR', 'HEARTRATE'}, 'spo2': {'SPO2', 'SPO2%', '%SPO2', 'SP02', 'SP02%'}}
     fields = {}
     problems = []
     full = ' '.join(t['text'] for t in tokens)
@@ -125,21 +125,47 @@ def analyze_bytes(content: bytes, selected_type: str = 'auto') -> dict:
     global _engine
     image=cv2.imdecode(np.frombuffer(content,dtype=np.uint8),cv2.IMREAD_COLOR)
     gray=cv2.cvtColor(image,cv2.COLOR_BGR2GRAY)
+    def recognize(candidate):
+        output,_=_engine(candidate)
+        tokens=[]
+        # Normalize geometry for the parser so higher resolution does not break label distances.
+        scale=1000/max(candidate.shape[:2])
+        for points,text,confidence in output or []:
+            xy=np.array(points)
+            tokens.append({'text':text,'confidence':float(confidence),'x':float(xy[:,0].mean())*scale,
+                           'y':float(xy[:,1].mean())*scale,'h':float(xy[:,1].max()-xy[:,1].min())*scale,'box':xy.tolist()})
+        return parse_tokens(tokens,selected_type)
+    def score(candidate):
+        return sum(1 for f in candidate['fields'] if f['unit'] is not None and f.get('confidence',0)>=.9)
+    variant='original'
     with _lock:
         if _engine is None:
             from rapidocr_onnxruntime import RapidOCR
             _engine=RapidOCR(intra_op_num_threads=2, inter_op_num_threads=1)
-        output,_=_engine(image)
-    tokens=[]
-    for points,text,confidence in output or []:
-        xy=np.array(points)
-        tokens.append({'text':text, 'confidence':float(confidence),
-                       'x':float(xy[:,0].mean()),'y':float(xy[:,1].mean()),
-                       'h':float(xy[:,1].max()-xy[:,1].min()),
-                       'box':xy.tolist()})
-    result=parse_tokens(tokens,selected_type)
+        result=recognize(image)
+        # A second pass helps uneven lighting. It never fabricates obscured digits.
+        from backend.app.devices.catalog import DEVICES
+        required=DEVICES.get(result['device_type'],{}).get('required',[])
+        usable={f['code'] for f in result['fields'] if f['unit'] is not None and f.get('confidence',0)>=.9}
+        if not required or not set(required).issubset(usable):
+            enhanced=cv2.createCLAHE(clipLimit=2.0,tileGridSize=(8,8)).apply(gray)
+            if float(np.median(enhanced))<110:
+                enhanced=cv2.bitwise_not(enhanced)
+            enhanced=cv2.cvtColor(enhanced,cv2.COLOR_GRAY2BGR)
+            alternative=recognize(enhanced)
+            high_original={f['code']:f for f in result['fields'] if f.get('confidence',0)>=.9 and f['unit'] is not None}
+            conflicts=any(f['code'] in high_original and f.get('confidence',0)>=.9 and f['unit']==high_original[f['code']]['unit']
+                          and abs(f['value']-high_original[f['code']]['value'])>{'pulse':2,'spo2':1}.get(f['code'],0) for f in alternative['fields'])
+            if score(alternative)>score(result):result=alternative;variant='local_contrast'
+            if conflicts:
+                result['recognition']='ambiguous'
+                result['warnings'].append('Las dos versiones de la imagen dan valores distintos. Cambia el ángulo o el encuadre; no se guardará esta lectura.')
     result['quality']={'sharpness':round(float(cv2.Laplacian(gray,cv2.CV_64F).var()),1),
-                       'brightness':round(float(gray.mean()),1),'width':image.shape[1],'height':image.shape[0]}
+                       'brightness':round(float(gray.mean()),1),'width':image.shape[1],'height':image.shape[0],
+                       'bright_fraction':round(float((gray>248).mean()),3),'contrast':round(float(np.percentile(gray,95)-np.percentile(gray,5)),1)}
+    result['preprocessing']=variant
     if result['quality']['sharpness']<20:
         result['warnings'].append('La imagen puede estar desenfocada. El criterio es experimental.')
+    if result['quality']['bright_fraction']>.15 and result['recognition']!='visible_labels':
+        result['warnings'].append('Hay zonas muy brillantes: inclina ligeramente el dispositivo o la cámara para apartar el reflejo de los números.')
     return result

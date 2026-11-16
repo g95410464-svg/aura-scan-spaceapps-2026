@@ -109,3 +109,13 @@ class LiveReading(Base):
     created_at: Mapped[str] = mapped_column(String(40), default=now_iso)
     readings: Mapped[list] = mapped_column(JSON)
     status: Mapped[str] = mapped_column(String(20), default='pending')
+
+
+class SimulationRun(Base):
+    __tablename__ = 'workspace_simulation_runs'
+    __table_args__ = (UniqueConstraint('owner_id','run_key'),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    owner_id: Mapped[str] = mapped_column(ForeignKey('workspaces.id'), index=True)
+    run_key: Mapped[str] = mapped_column(String(36))
+    created_at: Mapped[str] = mapped_column(String(40), default=now_iso)
+    result: Mapped[dict] = mapped_column(JSON, default=dict)
